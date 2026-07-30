@@ -112,6 +112,7 @@ button{cursor:pointer;}
 .welcome-sub{font-size:13px;color:var(--sub);margin-top:2px;}
 .home-top-grid{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-top:16px;}
 .stat-tile{border-radius:24px;padding:20px;text-align:center;}
+.stat-tile .gradient-icon-wrap{margin:0 auto;}
 .stat-tile.teal{background:var(--teal);}
 .stat-tile.dark{background:#20221E;}
 .stat-num{font-size:26px;font-weight:900;color:#20221E;margin-top:8px;}
