@@ -1,5 +1,5 @@
 #!/bin/bash
-cd "/Users/madisonmoore/Downloads/Honolulu Marathon training tracker/webapp"
+cd "/Users/madisonmoore/Projects/Honolulu Marathon training tracker/webapp"
 git add -A
 git commit -m "update - $(date '+%b %d %Y %H:%M')"
 git push
