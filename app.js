@@ -266,17 +266,11 @@ function renderOuraWidget() {
     </div>`;
   }
 
-  const dayLabel = (iso) => {
-    if (!iso || iso === TODAY_ISO) return null;
-    const [y, m, d] = iso.split('-').map(Number);
-    return `as of ${MONTHS[m - 1]} ${d}`;
-  };
-
   const tiles = [
-    { label: 'Readiness', value: s.readiness?.score, day: s.readiness?.day, icon: 'ti ti-heartbeat', color: 'var(--teal)' },
-    { label: 'Sleep', value: s.sleep?.score, day: s.sleep?.day, icon: 'ti ti-moon', color: 'var(--phase2)' },
-    { label: 'Activity', value: s.activity?.score, day: s.activity?.day, icon: 'ti ti-flame', color: 'var(--coral)' },
-    { label: 'Steps', value: s.activity?.steps, day: s.activity?.day, icon: 'ti ti-walk', color: 'var(--phase3)', isCount: true },
+    { label: 'Readiness', value: s.readiness?.score, icon: 'ti ti-heartbeat', color: 'var(--teal)' },
+    { label: 'Sleep', value: s.sleep?.score, icon: 'ti ti-moon', color: 'var(--phase2)' },
+    { label: 'Activity', value: s.activity?.score, icon: 'ti ti-flame', color: 'var(--coral)' },
+    { label: 'Steps', value: s.activity?.steps, icon: 'ti ti-walk', color: 'var(--phase3)', isCount: true },
   ];
 
   return `<div class="card oura-grid-card">
@@ -290,7 +284,6 @@ function renderOuraWidget() {
           <i class="${t.icon}" style="color:${t.color};"></i>
           <div class="oura-tile-value">${t.value != null ? (t.isCount ? t.value.toLocaleString() : t.value) : '—'}</div>
           <div class="oura-tile-label">${t.label}</div>
-          ${dayLabel(t.day) ? `<div class="oura-tile-stale">${dayLabel(t.day)}</div>` : ''}
         </div>`).join('')}
     </div>
   </div>`;
