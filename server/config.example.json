@@ -1,0 +1,15 @@
+{
+  "port": 4173,
+
+  "oura": {
+    "_setup": "Go to https://cloud.ouraring.com/personal-access-tokens, create a token, paste it below.",
+    "personal_access_token": ""
+  },
+
+  "strava": {
+    "_setup": "Go to https://www.strava.com/settings/api, create an API application (Authorization Callback Domain: localhost), paste the Client ID and Client Secret below.",
+    "client_id": "",
+    "client_secret": "",
+    "redirect_uri": "http://localhost:4173/auth/strava/callback"
+  }
+}
