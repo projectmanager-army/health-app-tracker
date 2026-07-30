@@ -211,7 +211,7 @@ function renderSidebar() {
       <div class="blob" style="width:90px;height:90px;background:var(--phase3);filter:blur(26px);opacity:0.25;top:10px;right:10px;"></div>
       <div class="countdown-label">Countdown</div>
       <div class="countdown-title">Honolulu Marathon</div>
-      <div class="countdown-digits">
+      <div class="countdown-digits" id="countdown-digits">
         ${digits.map((d) => `<div class="countdown-digit"><div class="split"></div><span>${d}</span></div>`).join('')}
       </div>
       <div class="countdown-sub">Days · Dec 13, 2026</div>
@@ -798,7 +798,7 @@ function renderRace() {
       <div class="race-hero-overlay"></div>
       <div class="race-hero-content">
         <div class="race-hero-eyebrow">Race day countdown ${state.racePhoto ? '' : '· click to add a photo'}</div>
-        <div class="race-hero-days">${daysToRace} days · Dec 13, 2026</div>
+        <div class="race-hero-days" id="race-hero-days">${daysToRace} days · Dec 13, 2026</div>
         <div class="race-hero-sub">Honolulu, HI · start ~5:00am</div>
       </div>
     </div>
@@ -1106,6 +1106,24 @@ function handleOAuthRedirectParams() {
   }
 }
 
+// Recomputes the race countdown and patches just the digit/text nodes in
+// place, so it stays accurate across midnight without a full re-render
+// (which would blow away focus/typed input elsewhere on the page).
+function updateCountdownDisplays() {
+  const daysToRace = Math.max(0, Math.ceil((RACE_DATE - new Date()) / 86400000));
+
+  const digitsEl = document.getElementById('countdown-digits');
+  if (digitsEl) {
+    const digits = String(daysToRace).padStart(3, '0').split('');
+    digitsEl.innerHTML = digits.map((d) => `<div class="countdown-digit"><div class="split"></div><span>${d}</span></div>`).join('');
+  }
+
+  const raceDaysEl = document.getElementById('race-hero-days');
+  if (raceDaysEl) {
+    raceDaysEl.textContent = `${daysToRace} days · Dec 13, 2026`;
+  }
+}
+
 function saveCycleStart() {
   const input = document.getElementById('cycle-start-input');
   if (!input || !input.value) return;
@@ -1204,3 +1222,4 @@ document.addEventListener('keydown', (e) => {
 handleOAuthRedirectParams();
 render();
 fetchStatus();
+setInterval(updateCountdownDisplays, 60000);
