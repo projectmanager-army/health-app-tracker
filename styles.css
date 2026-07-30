@@ -132,6 +132,7 @@ button{cursor:pointer;}
 .oura-tile i{font-size:18px;}
 .oura-tile-value{font-size:22px;font-weight:800;margin-top:8px;}
 .oura-tile-label{font-size:11px;color:var(--sub);margin-top:2px;text-transform:uppercase;letter-spacing:0.03em;}
+.oura-tile-stale{font-size:10px;color:var(--amber-text);margin-top:4px;}
 
 .cycle-card{margin-top:16px;}
 .cycle-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
