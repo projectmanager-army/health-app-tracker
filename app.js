@@ -23,7 +23,10 @@ const ui = {
 };
 
 const WEEKS = buildWeeks();
-const TODAY_ISO = today();
+// let, not const: rolled over automatically at midnight by checkMidnightRollover()
+// so mobility/supplements/checklist/water/protein reset to a fresh day without
+// needing a page reload.
+let TODAY_ISO = today();
 
 function persist() { save(state); }
 
@@ -1124,6 +1127,30 @@ function updateCountdownDisplays() {
   }
 }
 
+// Detects a real calendar-day change (e.g. the tab was left open past midnight)
+// and rolls today's tracking state over to a fresh day. Because mobility/
+// supplements/checklist/water/protein are all keyed by TODAY_ISO in
+// state.daily, simply advancing TODAY_ISO to the new date and re-rendering is
+// enough -- getDay() returns a blank day for a date with no stored entry yet,
+// so everything appears unchecked/zeroed with no separate "reset" step needed.
+function checkMidnightRollover() {
+  const nowIso = today();
+  if (nowIso === TODAY_ISO) return;
+  TODAY_ISO = nowIso;
+
+  // Cycle day is normally only recomputed when the user sets a start date;
+  // keep it honest across a day change too, the same way the countdown is.
+  if (state.cycleStartDate) {
+    const start = new Date(state.cycleStartDate + 'T00:00:00');
+    const diff = Math.floor((new Date() - start) / 86400000);
+    state.cycleDay = ((diff % 28) + 28) % 28 + 1;
+    persist();
+  }
+
+  render();
+  toast("New day — today's tracking has reset.");
+}
+
 function saveCycleStart() {
   const input = document.getElementById('cycle-start-input');
   if (!input || !input.value) return;
@@ -1222,4 +1249,7 @@ document.addEventListener('keydown', (e) => {
 handleOAuthRedirectParams();
 render();
 fetchStatus();
-setInterval(updateCountdownDisplays, 60000);
+setInterval(() => {
+  updateCountdownDisplays();
+  checkMidnightRollover();
+}, 60000);
