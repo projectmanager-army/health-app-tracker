@@ -124,6 +124,15 @@ button{cursor:pointer;}
 .phase-title-dark{font-size:17px;font-weight:800;color:#F2F0E9;margin-top:8px;}
 .phase-sub-dark{font-size:12px;color:rgba(242,240,233,0.6);margin-top:2px;}
 
+.oura-grid-card{margin-top:16px;}
+.oura-grid-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.oura-grid-title{font-size:14px;font-weight:700;}
+.oura-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;}
+.oura-tile{background:var(--surface2);border-radius:16px;padding:16px 12px;text-align:center;}
+.oura-tile i{font-size:18px;}
+.oura-tile-value{font-size:22px;font-weight:800;margin-top:8px;}
+.oura-tile-label{font-size:11px;color:var(--sub);margin-top:2px;text-transform:uppercase;letter-spacing:0.03em;}
+
 .cycle-card{margin-top:16px;}
 .cycle-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .cycle-head-left{display:flex;align-items:center;gap:10px;}

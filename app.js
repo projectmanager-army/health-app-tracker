@@ -18,6 +18,7 @@ const ui = {
   toast: null,
   integrations: { oura: false, strava: false, configured: { oura: false, strava: false } },
   ouraLive: null,      // {score, day} | {error}
+  ouraSummary: null,   // {readiness, sleep, activity} | {error}
   stravaSyncing: false,
 };
 
@@ -248,6 +249,46 @@ function renderSidebar() {
 
 // ---------------- home ----------------
 
+function renderOuraWidget() {
+  if (!ui.integrations.oura) return '';
+  const s = ui.ouraSummary;
+
+  if (!s) {
+    return `<div class="card oura-grid-card"><div class="oura-grid-head"><div class="oura-grid-title">Oura today</div></div><div class="integ-hint">Loading…</div></div>`;
+  }
+  if (s.error) {
+    return `<div class="card oura-grid-card">
+      <div class="oura-grid-head">
+        <div class="oura-grid-title">Oura today</div>
+        <button class="btn-ghost" style="flex:none;padding:6px 12px;font-size:11.5px;" data-action="refresh-oura-summary">Refresh</button>
+      </div>
+      <div class="integ-error">${s.error === 'unauthorized' ? 'Token expired — update it in server config.' : 'Could not load Oura data.'}</div>
+    </div>`;
+  }
+
+  const tiles = [
+    { label: 'Readiness', value: s.readiness?.score, icon: 'ti ti-heartbeat', color: 'var(--teal)' },
+    { label: 'Sleep', value: s.sleep?.score, icon: 'ti ti-moon', color: 'var(--phase2)' },
+    { label: 'Activity', value: s.activity?.score, icon: 'ti ti-flame', color: 'var(--coral)' },
+    { label: 'Steps', value: s.activity?.steps, icon: 'ti ti-walk', color: 'var(--phase3)', isCount: true },
+  ];
+
+  return `<div class="card oura-grid-card">
+    <div class="oura-grid-head">
+      <div class="oura-grid-title">Oura today</div>
+      <button class="btn-ghost" style="flex:none;padding:6px 12px;font-size:11.5px;" data-action="refresh-oura-summary">Refresh</button>
+    </div>
+    <div class="oura-grid">
+      ${tiles.map((t) => `
+        <div class="oura-tile">
+          <i class="${t.icon}" style="color:${t.color};"></i>
+          <div class="oura-tile-value">${t.value != null ? (t.isCount ? t.value.toLocaleString() : t.value) : '—'}</div>
+          <div class="oura-tile-label">${t.label}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
 function renderHome() {
   const wk = currentWeek();
   const readiness = getReadiness();
@@ -286,6 +327,8 @@ function renderHome() {
         <div class="stat-label-light">this week</div>
       </div>
     </div>
+
+    ${renderOuraWidget()}
 
     <div class="card cycle-card">
       <div class="cycle-head">
@@ -998,7 +1041,7 @@ async function fetchStatus() {
     ui.integrations = { oura: false, strava: false, configured: { oura: false, strava: false } };
   }
   render();
-  if (ui.integrations.oura) fetchOuraReadiness(false);
+  if (ui.integrations.oura) { fetchOuraReadiness(false); fetchOuraSummary(false); }
   if (ui.integrations.strava) syncStrava(false);
 }
 
@@ -1010,6 +1053,16 @@ async function fetchOuraReadiness(manual) {
   }
   render();
   if (manual) toast(typeof ui.ouraLive.score === 'number' ? `Oura readiness: ${ui.ouraLive.score}` : 'Could not refresh Oura readiness');
+}
+
+async function fetchOuraSummary(manual) {
+  try {
+    ui.ouraSummary = await fetch('/api/oura/summary').then((r) => r.json());
+  } catch {
+    ui.ouraSummary = { connected: true, error: 'network' };
+  }
+  render();
+  if (manual) toast(ui.ouraSummary.error ? 'Could not refresh Oura data' : 'Oura data refreshed');
 }
 
 async function syncStrava(manual) {
@@ -1119,7 +1172,8 @@ document.addEventListener('click', (e) => {
     case 'add-shoe-km': addShoeKm(id); break;
     case 'shoe-photo': shoePhotoPick(id); break;
     case 'race-photo': racePhotoPick(); break;
-    case 'refresh-oura': fetchOuraReadiness(true); break;
+    case 'refresh-oura': fetchOuraReadiness(true); fetchOuraSummary(true); break;
+    case 'refresh-oura-summary': fetchOuraSummary(true); break;
     case 'sync-strava': syncStrava(true); break;
     case 'disconnect-strava': disconnectStrava(); break;
     case 'stop': e.stopPropagation(); break;

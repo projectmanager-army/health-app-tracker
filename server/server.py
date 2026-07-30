@@ -106,26 +106,61 @@ def http_request(url, data=None, headers=None, method=None):
 
 # ---------------- Oura ----------------
 
+def oura_fetch_latest(token, endpoint):
+    """Fetch the most recent entry from an Oura v2 daily_* collection.
+    Returns (entry_dict_or_None, error_code_or_None)."""
+    end = time.strftime('%Y-%m-%d')
+    start = time.strftime('%Y-%m-%d', time.localtime(time.time() - 3 * 86400))
+    url = f'{OURA_API}/v2/usercollection/{endpoint}?start_date={start}&end_date={end}'
+    try:
+        data = http_request(url, headers={'Authorization': f'Bearer {token}'})
+    except urllib.error.HTTPError as e:
+        return None, ('unauthorized' if e.code == 401 else f'http_{e.code}')
+    except Exception:
+        return None, 'network'
+    entries = data.get('data', [])
+    if not entries:
+        return None, 'no_data'
+    return sorted(entries, key=lambda e: e['day'])[-1], None
+
+
 def oura_get_readiness(config):
     token = (config.get('oura') or {}).get('personal_access_token', '').strip()
     if not token:
         return {'connected': False}
-    end = time.strftime('%Y-%m-%d')
-    start = time.strftime('%Y-%m-%d', time.localtime(time.time() - 3 * 86400))
-    url = f'{OURA_API}/v2/usercollection/daily_readiness?start_date={start}&end_date={end}'
-    try:
-        data = http_request(url, headers={'Authorization': f'Bearer {token}'})
-    except urllib.error.HTTPError as e:
-        if e.code == 401:
-            return {'connected': True, 'error': 'unauthorized'}
-        return {'connected': True, 'error': f'http_{e.code}'}
-    except Exception:
-        return {'connected': True, 'error': 'network'}
-    entries = data.get('data', [])
-    if not entries:
+    entry, error = oura_fetch_latest(token, 'daily_readiness')
+    if error:
+        return {'connected': True, 'error': error}
+    return {'connected': True, 'score': entry.get('score'), 'day': entry.get('day')}
+
+
+def oura_get_summary(config):
+    """Readiness + sleep + activity (which includes step count) in one call."""
+    token = (config.get('oura') or {}).get('personal_access_token', '').strip()
+    if not token:
+        return {'connected': False}
+
+    readiness, r_err = oura_fetch_latest(token, 'daily_readiness')
+    sleep, s_err = oura_fetch_latest(token, 'daily_sleep')
+    activity, a_err = oura_fetch_latest(token, 'daily_activity')
+
+    if 'unauthorized' in (r_err, s_err, a_err):
+        return {'connected': True, 'error': 'unauthorized'}
+
+    result = {'connected': True}
+    if readiness:
+        result['readiness'] = {'score': readiness.get('score'), 'day': readiness.get('day')}
+    if sleep:
+        result['sleep'] = {'score': sleep.get('score'), 'day': sleep.get('day')}
+    if activity:
+        result['activity'] = {
+            'score': activity.get('score'),
+            'steps': activity.get('steps'),
+            'day': activity.get('day'),
+        }
+    if not any(k in result for k in ('readiness', 'sleep', 'activity')):
         return {'connected': True, 'error': 'no_data'}
-    latest = sorted(entries, key=lambda e: e['day'])[-1]
-    return {'connected': True, 'score': latest.get('score'), 'day': latest.get('day')}
+    return result
 
 
 # ---------------- Strava ----------------
@@ -256,6 +291,11 @@ class Handler(BaseHTTPRequestHandler):
             if not config:
                 return self.send_json({'connected': False, 'error': 'no_config'})
             return self.send_json(oura_get_readiness(config))
+
+        if path == '/api/oura/summary':
+            if not config:
+                return self.send_json({'connected': False, 'error': 'no_config'})
+            return self.send_json(oura_get_summary(config))
 
         if path == '/api/strava/activities':
             if not config or not (config.get('strava') or {}).get('client_id'):
