@@ -135,7 +135,7 @@ function renderHeader() {
     ['overview', 'ti ti-chart-bar', 'Overview'],
     ['plan', 'ti ti-calendar', 'Plan'],
     ['mobility', 'ti ti-stretching', 'Mobility'],
-    ['supplements', 'ti ti-pill', 'Supplements'],
+    ['supplements', 'ti ti-apple', 'Nutrition'],
     ['cycle', 'ti ti-moon-stars', 'Cycle'],
     ['shoes', 'ti ti-shoe', 'Shoes'],
     ['race', 'ti ti-flag-2', 'Race Day'],
@@ -676,6 +676,7 @@ function renderProteinLookupResult() {
 function renderSupplements() {
   const day = getDay(state, TODAY_ISO);
   const proteinPct = (day.proteinGrams / 110) * 100;
+  const waterPct = (day.waterMl / 2200) * 100;
 
   const suppRow = (id) => {
     const info = SUPP_INFO[id];
@@ -698,8 +699,8 @@ function renderSupplements() {
 
   return `
   <div>
-    <div class="page-title" style="margin-bottom:4px;">Supplement log</div>
-    <div class="page-sub" style="margin-bottom:18px;">Cruelty-free stack — click any item to see why it's there.</div>
+    <div class="page-title" style="margin-bottom:4px;">Nutrition</div>
+    <div class="page-sub" style="margin-bottom:18px;">Water, protein, and the cruelty-free supplement stack — click any item to see why it's there.</div>
 
     <div class="card supp-hero">
       ${ring(76, 8, proteinPct, 'var(--teal)')}
@@ -732,6 +733,25 @@ function renderSupplements() {
             <button class="quick-add-btn lg" data-action="protein-lookup-search">${ui.proteinLookupLoading ? 'Looking up…' : 'Look up'}</button>
           </div>
           ${renderProteinLookupResult()}
+        </div>
+      </div>
+    </div>
+
+    <div class="card supp-hero">
+      ${ring(76, 8, waterPct, 'var(--phase2)')}
+      <div style="flex:1;min-width:0;">
+        <div class="supp-hero-title">Water today</div>
+        <div class="supp-hero-sub">${day.waterMl}ml of 2200ml target.</div>
+        <div class="quick-adds">
+          <button class="quick-add-btn lg" data-action="add-water" data-ml="250">+250ml</button>
+          <button class="quick-add-btn lg" data-action="add-water" data-ml="500">+500ml</button>
+          <button class="quick-add-btn lg" data-action="add-water" data-ml="750">+750ml</button>
+          <button class="quick-add-btn reset" data-action="reset-water">Reset</button>
+        </div>
+
+        <div class="protein-manual-row">
+          <input type="number" min="0" id="water-manual-input" placeholder="ml" class="protein-manual-input">
+          <button class="quick-add-btn lg" data-action="add-water-manual">Add</button>
         </div>
       </div>
     </div>
@@ -1093,6 +1113,16 @@ function addWater(ml) {
   setDay(state, TODAY_ISO, { waterMl: Math.max(0, day.waterMl + ml) });
   persist(); render();
 }
+function resetWater() {
+  setDay(state, TODAY_ISO, { waterMl: 0 });
+  persist(); render();
+}
+function addWaterManual() {
+  const input = document.getElementById('water-manual-input');
+  const ml = parseFloat(input.value);
+  if (!ml || ml <= 0) return;
+  addWater(Math.round(ml));
+}
 function doAddChecklist() {
   const label = ui.newChecklistItem.trim();
   if (!label) return;
@@ -1302,6 +1332,8 @@ document.addEventListener('click', (e) => {
     case 'add-checklist': doAddChecklist(); break;
     case 'toggle-prerace': togglePrerace(id); break;
     case 'add-water': addWater(parseInt(target.dataset.ml, 10)); break;
+    case 'reset-water': resetWater(); break;
+    case 'add-water-manual': addWaterManual(); break;
     case 'add-protein': addProtein(parseInt(target.dataset.g, 10)); break;
     case 'reset-protein': resetProtein(); break;
     case 'add-protein-manual': addProteinManual(); break;
