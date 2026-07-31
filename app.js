@@ -48,6 +48,20 @@ function computeDaysToRace() {
   return Math.max(0, daysBetween(new Date(), RACE_DATE));
 }
 
+// Cycle day is always derived fresh from cycleStartDate, never cached --
+// a stored value only updates when something explicitly recomputes it, which
+// silently goes stale if the tab isn't open at the exact moment a day rolls
+// over (laptop asleep, tab closed). Deriving it on every read means it's
+// correct on any page load or render, no matter when you last had it open.
+function currentCycleDay() {
+  if (state.cycleStartDate) {
+    const start = new Date(state.cycleStartDate + 'T00:00:00');
+    const diff = daysBetween(start, new Date());
+    return ((diff % 28) + 28) % 28 + 1;
+  }
+  return state.cycleDay || 1;
+}
+
 function getReadiness() {
   if (ui.integrations.oura && ui.ouraLive && typeof ui.ouraLive.score === 'number') {
     return ui.ouraLive.score;
@@ -346,8 +360,9 @@ function renderHome() {
   const todayLabel = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const { weekIdx } = currentWeekInfo();
 
-  const cyclePhase = cyclePhaseForDay(state.cycleDay || 1);
-  const dots = Array.from({ length: 28 }, (_, i) => `<div class="cycle-dot" style="background:${i + 1 === (state.cycleDay || 1) ? cyclePhase.color : 'var(--surface2)'};"></div>`).join('');
+  const cycleDayNum = currentCycleDay();
+  const cyclePhase = cyclePhaseForDay(cycleDayNum);
+  const dots = Array.from({ length: 28 }, (_, i) => `<div class="cycle-dot" style="background:${i + 1 === cycleDayNum ? cyclePhase.color : 'var(--surface2)'};"></div>`).join('');
 
   const km = weeklyKm();
   const mobilityDoneCount = Object.keys(MOBILITY_LABELS).filter((id) => day.mobility[id]).length;
@@ -372,7 +387,7 @@ function renderHome() {
         </div>
         <span class="cycle-badge" style="background:${cyclePhase.soft};color:${cyclePhase.color};">${cyclePhase.label}</span>
       </div>
-      <div class="cycle-note">Day ${state.cycleDay || 1} of 28 · ${cyclePhase.note}</div>
+      <div class="cycle-note">Day ${cycleDayNum} of 28 · ${cyclePhase.note}</div>
       <div class="cycle-dots">${dots}</div>
       <div class="cycle-foods">
         <div class="cycle-foods-label">Recommended foods</div>
@@ -797,7 +812,7 @@ function renderSupplements() {
 // ---------------- cycle ----------------
 
 function renderCycle() {
-  const cycleDay = state.cycleDay || 1;
+  const cycleDay = currentCycleDay();
   const phase = cyclePhaseForDay(cycleDay);
   const activeId = ui.selectedCyclePhaseId || phase.id;
   const activePhase = CYCLE_DATA[activeId];
@@ -1296,16 +1311,8 @@ function checkMidnightRollover() {
   const nowIso = today();
   if (nowIso === TODAY_ISO) return;
   TODAY_ISO = nowIso;
-
-  // Cycle day is normally only recomputed when the user sets a start date;
-  // keep it honest across a day change too, the same way the countdown is.
-  if (state.cycleStartDate) {
-    const start = new Date(state.cycleStartDate + 'T00:00:00');
-    const diff = daysBetween(start, new Date());
-    state.cycleDay = ((diff % 28) + 28) % 28 + 1;
-    persist();
-  }
-
+  // Cycle day is derived fresh by currentCycleDay() on every render, so
+  // there's nothing to recompute here -- just re-render to pick it up.
   render();
   toast("New day — today's tracking has reset.");
 }
@@ -1314,9 +1321,6 @@ function saveCycleStart() {
   const input = document.getElementById('cycle-start-input');
   if (!input || !input.value) return;
   state.cycleStartDate = input.value;
-  const start = new Date(input.value + 'T00:00:00');
-  const diff = daysBetween(start, new Date());
-  state.cycleDay = ((diff % 28) + 28) % 28 + 1;
   ui.showCycleDatePicker = false;
   persist(); render();
 }
