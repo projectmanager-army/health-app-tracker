@@ -1,7 +1,28 @@
 // Training plan data & content, ported from the Honolulu Marathon App Spec.
 
-export const RACE_DATE = new Date(2026, 11, 13); // Dec 13, 2026
-export const PLAN_START = new Date(2026, 5, 3); // Jun 3, 2026
+export const RACE_DATE = new Date(2026, 11, 13); // Dec 13, 2026 (a Sunday)
+// Week 1 must start on a real Monday for the Mon-Sun day labels/templates to
+// line up correctly, and 27 weeks later must land exactly on RACE_DATE.
+// Jun 8, 2026 is the Monday of the week 27 weeks before race week.
+export const PLAN_START = new Date(2026, 5, 8); // Jun 8, 2026 (a Monday)
+
+// Calendar-safe date math. Plain `new Date(x.getTime() + n*86400000)` breaks
+// across a Daylight Saving transition (a "day" isn't always exactly 24h in
+// local time), which silently shifts every date computed from it by up to a
+// day. This training plan spans Nov 1, 2026 (the DST fall-back), so this
+// matters for real: use these instead of raw millisecond arithmetic anywhere
+// a specific calendar date is being constructed or compared.
+export function addDays(date, n) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+export function daysBetween(a, b) {
+  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((db - da) / 86400000);
+}
 
 export const PHASES = [
   { name: 'Foundation', color: 'var(--phase1)', soft: 'var(--teal-soft)' },
@@ -78,19 +99,20 @@ export function buildWeeks() {
   for (let w = 1; w <= 27; w++) {
     const phaseIdx = phaseIdxForWeek(w);
     const phase = PHASES[phaseIdx];
-    const weekStart = new Date(PLAN_START.getTime() + (w - 1) * 7 * 86400000);
-    const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
+    const weekStart = addDays(PLAN_START, (w - 1) * 7);
+    const weekEnd = addDays(weekStart, 6);
     const dateLabel = `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()}–${weekEnd.getDate()}`;
     const longRun = LONG_RUN[w] ?? null;
     const days = TEMPLATES[phaseIdx].map((t, i) => {
-      const d = new Date(weekStart.getTime() + i * 86400000);
+      const d = addDays(weekStart, i);
       let type = t.type, detail = t.detail, code = t.code;
       if (i === 5 && longRun) detail = `${longRun}km · ${detail}`;
       if (w === 27) {
-        if (i === 3) { type = 'Easy jog + mobility'; detail = '10 min easy jog + mobility. Lay out all gear today.'; code = 'J'; }
-        else if (i === 4) { type = 'Full rest'; detail = 'Full rest. Short 5 min walk only. High-carb dinner, early bed.'; code = 'X'; }
-        else if (i === 5) { type = '🌺 RACE DAY'; detail = 'Honolulu Marathon. Start ~5am. Pre-race: electrolytes + banana. Go out slower than you think.'; code = '🌺'; }
-        else if (i === 6) { type = 'Recovery'; detail = 'You did it. Rest, hydrate, and celebrate.'; code = 'X'; }
+        // Week 27 runs Mon Dec 7 - Sun Dec 13, 2026 -- race day (Dec 13) is a
+        // real Sunday, landing correctly at index 6.
+        if (i === 4) { type = 'Easy jog + mobility'; detail = '10 min easy jog + mobility. Lay out all gear today.'; code = 'J'; }
+        else if (i === 5) { type = 'Full rest'; detail = 'Full rest. Short 5 min walk only. High-carb dinner, early bed.'; code = 'X'; }
+        else if (i === 6) { type = '🌺 RACE DAY'; detail = 'Honolulu Marathon. Start ~5am. Pre-race: electrolytes + banana. Go out slower than you think.'; code = '🌺'; }
       }
       return { label: `${DAY_LABELS[i]} ${MONTHS[d.getMonth()]} ${d.getDate()}`, day: i, type, detail, code, dateObj: d, iso: isoDate(d) };
     });
@@ -109,7 +131,7 @@ export function isoDate(d) {
 
 export function currentWeekInfo() {
   const now = new Date();
-  let diff = Math.floor((now - PLAN_START) / 86400000);
+  let diff = daysBetween(PLAN_START, now);
   if (diff < 0) diff = 0;
   if (diff > 26 * 7 + 6) diff = 26 * 7 + 6;
   return { weekIdx: Math.floor(diff / 7), dayIdx: diff % 7 };

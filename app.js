@@ -1,7 +1,7 @@
 import {
   PHASES, buildWeeks, currentWeekInfo, isoDate, MONTHS,
   SUPP_INFO, MOBILITY_LABELS, PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
-  iconFor, RACE_DATE,
+  iconFor, RACE_DATE, addDays, daysBetween,
 } from './data.js';
 import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak } from './storage.js';
 
@@ -37,6 +37,12 @@ function toast(msg) {
 }
 
 // ---------------- helpers ----------------
+
+// Whole calendar days remaining until race day, DST-safe (see addDays/
+// daysBetween in data.js -- raw millisecond math drifts across Nov 1, 2026).
+function computeDaysToRace() {
+  return Math.max(0, daysBetween(new Date(), RACE_DATE));
+}
 
 function getReadiness() {
   if (ui.integrations.oura && ui.ouraLive && typeof ui.ouraLive.score === 'number') {
@@ -193,7 +199,7 @@ function renderIntegrationsPopover() {
 // ---------------- sidebar ----------------
 
 function renderSidebar() {
-  const daysToRace = Math.max(0, Math.ceil((RACE_DATE - new Date()) / 86400000));
+  const daysToRace = computeDaysToRace();
   const digits = String(daysToRace).padStart(3, '0').split('');
   const wk = currentWeek();
   const { dayIdx } = currentWeekInfo();
@@ -424,7 +430,7 @@ function daysSinceFirstUse() {
   if (keys.length === 0) return 1;
   const earliest = keys.sort()[0];
   const earliestDate = new Date(earliest + 'T00:00:00');
-  const diff = Math.floor((new Date() - earliestDate) / 86400000) + 1;
+  const diff = daysBetween(earliestDate, new Date()) + 1;
   return Math.max(1, diff);
 }
 
@@ -438,7 +444,7 @@ function buildReport(period) {
   const checklistCount = Math.max(1, state.customChecklist.length);
 
   for (let i = 0; i < days; i++) {
-    const d = new Date(Date.now() - (days - 1 - i) * 86400000);
+    const d = addDays(new Date(), -(days - 1 - i));
     const iso = isoDate(d);
     const rec = state.daily[iso];
     const km = sumRunKmForDate(iso);
@@ -803,7 +809,7 @@ function renderShoes() {
 // ---------------- race day ----------------
 
 function renderRace() {
-  const daysToRace = Math.max(0, Math.ceil((RACE_DATE - new Date()) / 86400000));
+  const daysToRace = computeDaysToRace();
   const day = getDay(state, TODAY_ISO);
 
   const prerace = Object.keys(PRERACE_LABELS).map((id) => ({
@@ -1129,7 +1135,7 @@ function handleOAuthRedirectParams() {
 // place, so it stays accurate across midnight without a full re-render
 // (which would blow away focus/typed input elsewhere on the page).
 function updateCountdownDisplays() {
-  const daysToRace = Math.max(0, Math.ceil((RACE_DATE - new Date()) / 86400000));
+  const daysToRace = computeDaysToRace();
 
   const digitsEl = document.getElementById('countdown-digits');
   if (digitsEl) {
@@ -1158,7 +1164,7 @@ function checkMidnightRollover() {
   // keep it honest across a day change too, the same way the countdown is.
   if (state.cycleStartDate) {
     const start = new Date(state.cycleStartDate + 'T00:00:00');
-    const diff = Math.floor((new Date() - start) / 86400000);
+    const diff = daysBetween(start, new Date());
     state.cycleDay = ((diff % 28) + 28) % 28 + 1;
     persist();
   }
@@ -1172,7 +1178,7 @@ function saveCycleStart() {
   if (!input || !input.value) return;
   state.cycleStartDate = input.value;
   const start = new Date(input.value + 'T00:00:00');
-  const diff = Math.floor((new Date() - start) / 86400000);
+  const diff = daysBetween(start, new Date());
   state.cycleDay = ((diff % 28) + 28) % 28 + 1;
   ui.showCycleDatePicker = false;
   persist(); render();
