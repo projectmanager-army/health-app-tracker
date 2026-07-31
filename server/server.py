@@ -58,10 +58,11 @@ def load_raw_config_file():
 def load_config():
     """Merge server/config.json (local dev) with environment variables
     (production). Env vars win when both are present. Returns None if
-    neither Oura nor Strava is configured anywhere."""
+    nothing at all is configured."""
     config = load_raw_config_file()
     config.setdefault('oura', {})
     config.setdefault('strava', {})
+    config.setdefault('usda', {})
 
     env_oura_token = os.environ.get('OURA_PERSONAL_ACCESS_TOKEN')
     if env_oura_token:
@@ -76,9 +77,14 @@ def load_config():
         if val:
             config['strava'][key] = val
 
+    env_usda_key = os.environ.get('USDA_API_KEY')
+    if env_usda_key:
+        config['usda']['api_key'] = env_usda_key
+
     has_oura = bool(config['oura'].get('personal_access_token', '').strip())
     has_strava = bool(config['strava'].get('client_id'))
-    if not has_oura and not has_strava:
+    has_usda = bool(config['usda'].get('api_key', '').strip())
+    if not has_oura and not has_strava and not has_usda:
         return None
     return config
 
@@ -246,6 +252,49 @@ def strava_get_activities(config, days=90):
     return {'connected': True, 'activities': runs}
 
 
+# ---------------- USDA FoodData Central (protein lookup) ----------------
+
+USDA_SEARCH = 'https://api.nal.usda.gov/fdc/v1/foods/search'
+
+
+def usda_lookup_protein(config, query):
+    api_key = (config.get('usda') or {}).get('api_key', '').strip()
+    if not api_key:
+        return {'connected': False}
+
+    params = {
+        'query': query,
+        'dataType': 'Foundation,SR Legacy',  # generic whole foods, standardized per-100g values
+        'pageSize': 10,
+        'api_key': api_key,
+    }
+    url = f'{USDA_SEARCH}?{urllib.parse.urlencode(params)}'
+    try:
+        data = http_request(url)
+    except urllib.error.HTTPError as e:
+        if e.code == 401 or e.code == 403:
+            return {'connected': True, 'error': 'unauthorized'}
+        return {'connected': True, 'error': f'http_{e.code}'}
+    except Exception:
+        return {'connected': True, 'error': 'network'}
+
+    for food in data.get('foods', []):
+        description = food.get('description', '')
+        # "oil" entries (e.g. "Fish oil, salmon") are essentially never what
+        # someone means by a protein source -- skip them, not the point.
+        if 'oil' in description.lower():
+            continue
+        for nutrient in food.get('foodNutrients', []):
+            if nutrient.get('nutrientId') == 1003 and nutrient.get('value') is not None:
+                return {
+                    'connected': True,
+                    'found': True,
+                    'description': description,
+                    'proteinPer100g': nutrient['value'],
+                }
+    return {'connected': True, 'found': False}
+
+
 # ---------------- request handler ----------------
 
 class Handler(BaseHTTPRequestHandler):
@@ -281,11 +330,13 @@ class Handler(BaseHTTPRequestHandler):
             tokens = load_tokens()
             oura_on = bool(config and (config.get('oura') or {}).get('personal_access_token', '').strip())
             strava_on = bool(tokens.get('strava'))
+            usda_on = bool(config and (config.get('usda') or {}).get('api_key', '').strip())
             configured = {
                 'oura': bool(config and (config.get('oura') or {}).get('personal_access_token', '').strip()),
                 'strava': bool(config and (config.get('strava') or {}).get('client_id')),
+                'usda': usda_on,
             }
-            return self.send_json({'oura': oura_on, 'strava': strava_on, 'configured': configured})
+            return self.send_json({'oura': oura_on, 'strava': strava_on, 'usda': usda_on, 'configured': configured})
 
         if path == '/api/oura/readiness':
             if not config:
@@ -308,6 +359,14 @@ class Handler(BaseHTTPRequestHandler):
             tokens.pop('strava', None)
             save_tokens(tokens)
             return self.send_json({'ok': True})
+
+        if path == '/api/nutrition/protein':
+            if not config or not (config.get('usda') or {}).get('api_key'):
+                return self.send_json({'connected': False, 'error': 'no_config'})
+            food = query.get('food', '').strip()
+            if not food:
+                return self.send_json({'connected': True, 'error': 'no_query'})
+            return self.send_json(usda_lookup_protein(config, food))
 
         if path == '/auth/strava/login':
             if not config or not (config.get('strava') or {}).get('client_id'):

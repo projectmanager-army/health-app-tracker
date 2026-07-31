@@ -20,6 +20,10 @@ const ui = {
   ouraLive: null,      // {score, day} | {error}
   ouraSummary: null,   // {readiness, sleep, activity} | {error}
   stravaSyncing: false,
+  proteinLookupQuery: '',
+  proteinLookupResult: null,  // {description, proteinPer100g} | {error} | null
+  proteinLookupLoading: false,
+  proteinLookupGrams: 100,
 };
 
 const WEEKS = buildWeeks();
@@ -640,6 +644,35 @@ function renderMobility() {
 
 // ---------------- supplements ----------------
 
+function renderProteinLookupResult() {
+  const r = ui.proteinLookupResult;
+  if (!r) return '';
+
+  if (r.error) {
+    const msg = {
+      no_config: 'Add a USDA FoodData Central API key to server/config.json to enable lookup.',
+      no_query: 'Type a food name first.',
+      unauthorized: 'USDA API key invalid — check server/config.json.',
+    }[r.error] || 'Could not look that up right now.';
+    return `<div class="integ-error" style="margin-top:8px;">${esc(msg)}</div>`;
+  }
+  if (r.found === false) {
+    return `<div class="integ-hint" style="margin-top:8px;">No match found — try a different or simpler search term.</div>`;
+  }
+
+  const grams = ui.proteinLookupGrams;
+  const estimated = Math.round((r.proteinPer100g * grams) / 100);
+  return `
+    <div class="protein-lookup-match">
+      <div class="protein-lookup-match-desc">${esc(r.description)} — ${r.proteinPer100g}g protein per 100g</div>
+      <div class="protein-lookup-match-row">
+        <input type="number" min="0" id="protein-lookup-grams" value="${grams}" data-action="protein-lookup-grams-input">
+        <span class="protein-lookup-match-g">g ≈ ${estimated}g protein</span>
+        <button class="quick-add-btn lg" data-action="protein-lookup-add" data-grams="${estimated}">Add ${estimated}g</button>
+      </div>
+    </div>`;
+}
+
 function renderSupplements() {
   const day = getDay(state, TODAY_ISO);
   const proteinPct = (day.proteinGrams / 110) * 100;
@@ -670,7 +703,7 @@ function renderSupplements() {
 
     <div class="card supp-hero">
       ${ring(76, 8, proteinPct, 'var(--teal)')}
-      <div style="flex:1;">
+      <div style="flex:1;min-width:0;">
         <div class="supp-hero-title">Protein today</div>
         <div class="supp-hero-sub">${day.proteinGrams}g of 110g target — recovery &amp; tendon repair.</div>
         <div class="quick-adds">
@@ -678,7 +711,27 @@ function renderSupplements() {
           <button class="quick-add-btn lg" data-action="add-protein" data-g="25">+ Shake (25g)</button>
           <button class="quick-add-btn lg" data-action="add-protein" data-g="30">+ Meal (30g)</button>
           <button class="quick-add-btn lg" data-action="add-protein" data-g="10">+ Snack (10g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="20">+ Greek Yogurt (20g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="31">+ Chicken Breast (31g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="25">+ Salmon (25g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="24">+ Protein Powder (24g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="8">+ Tofu (8g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="8">+ Peanut Butter (8g)</button>
           <button class="quick-add-btn reset" data-action="reset-protein">Reset</button>
+        </div>
+
+        <div class="protein-manual-row">
+          <input type="number" min="0" id="protein-manual-input" placeholder="Grams" class="protein-manual-input">
+          <button class="quick-add-btn lg" data-action="add-protein-manual">Add</button>
+        </div>
+
+        <div class="protein-lookup">
+          <div class="protein-lookup-label">Don't know the protein content? Look it up:</div>
+          <div class="protein-lookup-row">
+            <input type="text" id="protein-lookup-input" placeholder="e.g. chicken breast" value="${esc(ui.proteinLookupQuery)}" data-action="protein-lookup-input">
+            <button class="quick-add-btn lg" data-action="protein-lookup-search">${ui.proteinLookupLoading ? 'Looking up…' : 'Look up'}</button>
+          </div>
+          ${renderProteinLookupResult()}
         </div>
       </div>
     </div>
@@ -950,6 +1003,27 @@ function attachInputHandlers() {
     checklistInput.addEventListener('input', (e) => { ui.newChecklistItem = e.target.value; });
     checklistInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAddChecklist(); });
   }
+  const proteinLookupInput = document.getElementById('protein-lookup-input');
+  if (proteinLookupInput) {
+    proteinLookupInput.addEventListener('input', (e) => { ui.proteinLookupQuery = e.target.value; });
+    proteinLookupInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') proteinLookupSearch(); });
+  }
+  // Patches just the live estimate + Add button in place (not a full render)
+  // so the grams input keeps focus while you type.
+  const lookupGramsInput = document.getElementById('protein-lookup-grams');
+  if (lookupGramsInput) {
+    lookupGramsInput.addEventListener('input', (e) => {
+      const grams = parseFloat(e.target.value) || 0;
+      ui.proteinLookupGrams = grams;
+      if (ui.proteinLookupResult && ui.proteinLookupResult.found) {
+        const estimated = Math.round((ui.proteinLookupResult.proteinPer100g * grams) / 100);
+        const gLabel = document.querySelector('.protein-lookup-match-g');
+        const addBtn = document.querySelector('[data-action="protein-lookup-add"]');
+        if (gLabel) gLabel.textContent = `g ≈ ${estimated}g protein`;
+        if (addBtn) { addBtn.textContent = `Add ${estimated}g`; addBtn.dataset.grams = String(estimated); }
+      }
+    });
+  }
 }
 
 // ---------------- actions ----------------
@@ -986,6 +1060,33 @@ function addProtein(g) {
 function resetProtein() {
   setDay(state, TODAY_ISO, { proteinGrams: 0 });
   persist(); render();
+}
+function addProteinManual() {
+  const input = document.getElementById('protein-manual-input');
+  const g = parseFloat(input.value);
+  if (!g || g <= 0) return;
+  addProtein(Math.round(g));
+}
+async function proteinLookupSearch() {
+  const query = ui.proteinLookupQuery.trim();
+  if (!query) return;
+  ui.proteinLookupLoading = true;
+  ui.proteinLookupResult = null;
+  render();
+  try {
+    ui.proteinLookupResult = await fetch(`/api/nutrition/protein?food=${encodeURIComponent(query)}`).then((r) => r.json());
+  } catch {
+    ui.proteinLookupResult = { error: 'network' };
+  }
+  ui.proteinLookupGrams = 100;
+  ui.proteinLookupLoading = false;
+  render();
+}
+function proteinLookupAdd(grams) {
+  addProtein(grams);
+  ui.proteinLookupQuery = '';
+  ui.proteinLookupResult = null;
+  toast(`Added ${grams}g protein`);
 }
 function addWater(ml) {
   const day = getDay(state, TODAY_ISO);
@@ -1203,6 +1304,9 @@ document.addEventListener('click', (e) => {
     case 'add-water': addWater(parseInt(target.dataset.ml, 10)); break;
     case 'add-protein': addProtein(parseInt(target.dataset.g, 10)); break;
     case 'reset-protein': resetProtein(); break;
+    case 'add-protein-manual': addProteinManual(); break;
+    case 'protein-lookup-search': proteinLookupSearch(); break;
+    case 'protein-lookup-add': proteinLookupAdd(parseInt(target.dataset.grams, 10)); break;
     case 'open-day': {
       const week = parseInt(target.dataset.week, 10);
       const dayIdx = parseInt(target.dataset.day, 10);

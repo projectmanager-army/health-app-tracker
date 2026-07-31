@@ -11,5 +11,10 @@
     "client_id": "",
     "client_secret": "",
     "redirect_uri": "http://localhost:4173/auth/strava/callback"
+  },
+
+  "usda": {
+    "_setup": "Go to https://fdc.nal.usda.gov/api-key-signup.html, sign up (instant, free, no card), paste the API key below.",
+    "api_key": ""
   }
 }
