@@ -413,8 +413,24 @@ function renderHome() {
 
 // ---------------- overview ----------------
 
+// Number of calendar days since the earliest record in state.daily (inclusive
+// of today). Used so "avg per day" divides by days you've actually been
+// using the tracker, not the full nominal period -- otherwise a brand-new
+// user selecting "week" would have today's real numbers averaged against six
+// days that predate the app even existing for them, making the average look
+// artificially low no matter how consistently they log.
+function daysSinceFirstUse() {
+  const keys = Object.keys(state.daily);
+  if (keys.length === 0) return 1;
+  const earliest = keys.sort()[0];
+  const earliestDate = new Date(earliest + 'T00:00:00');
+  const diff = Math.floor((new Date() - earliestDate) / 86400000) + 1;
+  return Math.max(1, diff);
+}
+
 function buildReport(period) {
   const days = period === 'week' ? 7 : period === 'month' ? 30 : 189;
+  const effectiveDays = Math.min(days, daysSinceFirstUse());
   let totalKm = 0, totalWater = 0, totalProtein = 0, mobilitySum = 0, suppSum = 0, checklistSum = 0;
   const dayBars = [];
   const mobilityCount = Object.keys(MOBILITY_LABELS).length;
@@ -443,12 +459,12 @@ function buildReport(period) {
   return {
     periodLabel: period === 'week' ? 'last 7 days' : period === 'month' ? 'last 30 days' : 'all time',
     totalKmLabel: fmtKm(totalKm),
-    avgKmLabel: fmtKm(totalKm / days),
-    avgWaterLabel: `${Math.round(totalWater / days)}ml`,
-    avgProteinLabel: `${Math.round(totalProtein / days)}g`,
-    mobilityPct: Math.round(mobilitySum / days),
-    suppPct: Math.round(suppSum / days),
-    checklistPct: Math.round(checklistSum / days),
+    avgKmLabel: fmtKm(totalKm / effectiveDays),
+    avgWaterLabel: `${Math.round(totalWater / effectiveDays)}ml`,
+    avgProteinLabel: `${Math.round(totalProtein / effectiveDays)}g`,
+    mobilityPct: Math.round(mobilitySum / effectiveDays),
+    suppPct: Math.round(suppSum / effectiveDays),
+    checklistPct: Math.round(checklistSum / effectiveDays),
     kmValues: bucketed.map((b) => b.km),
   };
 }
