@@ -145,7 +145,6 @@ button{cursor:pointer;}
 .cycle-foods{background:var(--surface2);border-radius:14px;padding:12px 14px;margin-bottom:12px;}
 .cycle-foods-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;}
 .cycle-foods-text{font-size:12.5px;line-height:1.6;}
-.cycle-nav{display:flex;gap:8px;}
 .btn-ghost{flex:1;border:none;background:var(--surface2);color:var(--text);border-radius:9px;padding:8px 0;font-size:12.5px;font-weight:600;}
 
 .two-col-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:16px;}

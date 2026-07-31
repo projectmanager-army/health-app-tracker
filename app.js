@@ -353,10 +353,6 @@ function renderHome() {
         <div class="cycle-foods-label">Recommended foods</div>
         <div class="cycle-foods-text">${cyclePhase.groups.map((g) => g.items).join(', ')}</div>
       </div>
-      <div class="cycle-nav">
-        <button class="btn-ghost" data-action="cycle-back">− day</button>
-        <button class="btn-ghost" data-action="cycle-forward">+ day</button>
-      </div>
     </div>
 
     <div class="two-col-grid">
@@ -728,10 +724,6 @@ function renderCycle() {
       </div>
       <div class="cycle-note" style="margin-bottom:14px;">${phase.note}</div>
       <div class="cycle-dots" style="margin-bottom:16px;">${dots}</div>
-      <div class="cycle-nav">
-        <button class="btn-ghost" style="border-radius:10px;padding:10px 0;font-size:13px;" data-action="cycle-back">− day</button>
-        <button class="btn-ghost" style="border-radius:10px;padding:10px 0;font-size:13px;" data-action="cycle-forward">+ day</button>
-      </div>
       <div style="margin-top:14px;text-align:center;">
         <button class="btn-ghost" style="flex:none;padding:8px 14px;" data-action="toggle-cycle-datepicker">${state.cycleStartDate ? 'Update period start date' : 'Set period start date'}</button>
       </div>
@@ -1014,13 +1006,6 @@ function doAddChecklist() {
   ui.newChecklistItem = '';
   persist(); render();
 }
-function moveCycleDay(delta) {
-  let d = (state.cycleDay || 1) + delta;
-  if (d < 1) d = 28;
-  if (d > 28) d = 1;
-  state.cycleDay = d;
-  persist(); render();
-}
 function selectCyclePhase(id) {
   ui.selectedCyclePhaseId = id;
   render();
@@ -1230,8 +1215,6 @@ document.addEventListener('click', (e) => {
     case 'close-day': ui.selectedDay = null; render(); break;
     case 'open-coldheat': ui.showColdHeat = true; render(); break;
     case 'close-coldheat': ui.showColdHeat = false; render(); break;
-    case 'cycle-back': moveCycleDay(-1); break;
-    case 'cycle-forward': moveCycleDay(1); break;
     case 'select-cycle-phase': selectCyclePhase(id); break;
     case 'toggle-cycle-datepicker': ui.showCycleDatePicker = !ui.showCycleDatePicker; render(); break;
     case 'save-cycle-start': saveCycleStart(); break;
