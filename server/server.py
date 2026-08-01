@@ -406,6 +406,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-Type', ctype)
         self.send_header('Content-Length', str(len(body)))
+        # Force revalidation on every load -- this is a small personal app that
+        # changes often; a browser silently serving a stale cached app.js or
+        # favicon (which browsers cache especially aggressively) after a
+        # deploy is worse than the minor cost of always re-fetching.
+        self.send_header('Cache-Control', 'no-cache, must-revalidate')
         self.end_headers()
         self.wfile.write(body)
 
