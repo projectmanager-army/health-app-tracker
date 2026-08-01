@@ -209,6 +209,12 @@ button{cursor:pointer;}
 .chart-card{background:#20221E;border-radius:24px;padding:20px;}
 .chart-card-title{font-size:14px;font-weight:700;color:#F2F0E9;margin-bottom:6px;}
 
+.backup-card{margin-top:14px;}
+.backup-card-title{font-size:14px;font-weight:700;}
+.backup-card-sub{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.5;max-width:520px;}
+.backup-card-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+.backup-card-actions .quick-add-btn{display:flex;align-items:center;gap:6px;}
+
 /* ---------- plan ---------- */
 .plan-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;flex-wrap:wrap;gap:10px;}
 .phase-legend{display:flex;gap:14px;flex-wrap:wrap;}

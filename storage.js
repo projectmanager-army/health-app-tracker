@@ -1,5 +1,5 @@
 // Persistence layer — localStorage backed, real data (no fake/demo numbers).
-import { isoDate, MOBILITY_LABELS, PRERACE_LABELS } from './data.js';
+import { isoDate, addDays, MOBILITY_LABELS, PRERACE_LABELS } from './data.js';
 
 const KEY = 'honolulu-tracker-v1';
 
@@ -49,6 +49,13 @@ export function load() {
   }
 }
 
+// Same safe-merge as load(), but for a backup file being restored rather
+// than localStorage -- so an older backup missing newer fields (added after
+// the backup was taken) still loads with sane defaults instead of breaking.
+export function mergeWithDefaults(parsed) {
+  return { ...defaultState(), ...parsed };
+}
+
 export function save(state) {
   localStorage.setItem(KEY, JSON.stringify(state));
 }
@@ -77,10 +84,10 @@ export function computeStreak(state, predicate, maxLookback = 400) {
     const day = state.daily[iso];
     if (day && predicate(day)) {
       streak++;
-      d = new Date(d.getTime() - 86400000);
+      d = addDays(d, -1);
     } else if (iso === todayIso()) {
       // today not done yet — doesn't break streak, just don't count it
-      d = new Date(d.getTime() - 86400000);
+      d = addDays(d, -1);
     } else {
       break;
     }

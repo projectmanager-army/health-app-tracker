@@ -3,7 +3,7 @@ import {
   SUPP_INFO, MOBILITY_LABELS, PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
   iconFor, RACE_DATE, addDays, daysBetween,
 } from './data.js';
-import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak } from './storage.js';
+import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak, mergeWithDefaults } from './storage.js';
 
 let state = load();
 const ui = {
@@ -576,6 +576,20 @@ function renderOverview() {
     <div class="chart-card">
       <div class="chart-card-title">Distance per day — ${report.periodLabel}</div>
       ${chartSvg(report.kmValues, 300, 110, 'var(--teal)', 'ovGrad')}
+    </div>
+
+    <div class="card backup-card">
+      <div class="backup-card-head">
+        <div>
+          <div class="backup-card-title">Backup &amp; restore</div>
+          <div class="backup-card-sub">Your data lives only in this browser. Export it periodically so a browser data-clear, a new device, or switching browsers never loses it.</div>
+        </div>
+      </div>
+      <div class="backup-card-actions">
+        <button class="quick-add-btn lg" data-action="export-backup"><i class="ti ti-download"></i> Download backup</button>
+        <button class="quick-add-btn lg" data-action="import-backup-trigger"><i class="ti ti-upload"></i> Restore from backup</button>
+        <input type="file" accept="application/json" id="import-backup-input" style="display:none;" data-action="import-backup-input">
+      </div>
     </div>
   </div>`;
 }
@@ -1325,6 +1339,48 @@ function saveCycleStart() {
   persist(); render();
 }
 
+// ---------------- backup / restore ----------------
+
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `honolulu-tracker-backup-${TODAY_ISO}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+}
+
+function importBackupTrigger() {
+  document.getElementById('import-backup-input').click();
+}
+
+function importBackupFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(reader.result);
+    } catch {
+      toast('That file is not a valid backup');
+      return;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      toast('That file is not a valid backup');
+      return;
+    }
+    state = mergeWithDefaults(parsed);
+    persist();
+    render();
+    toast('Backup restored');
+  };
+  reader.onerror = () => toast('Could not read that file');
+  reader.readAsText(file);
+}
+
 // ---------------- event delegation ----------------
 
 document.addEventListener('click', (e) => {
@@ -1379,6 +1435,8 @@ document.addEventListener('click', (e) => {
     case 'select-cycle-phase': selectCyclePhase(id); break;
     case 'toggle-cycle-datepicker': ui.showCycleDatePicker = !ui.showCycleDatePicker; render(); break;
     case 'save-cycle-start': saveCycleStart(); break;
+    case 'export-backup': exportBackup(); break;
+    case 'import-backup-trigger': importBackupTrigger(); break;
     case 'report-period': ui.reportPeriod = target.dataset.period; render(); break;
     case 'add-shoe-km': addShoeKm(id); break;
     case 'shoe-photo': shoePhotoPick(id); break;
@@ -1400,6 +1458,11 @@ document.addEventListener('change', (e) => {
   const raceTarget = e.target.closest('[data-action="race-photo-input"]');
   if (raceTarget && raceTarget.files[0]) {
     racePhotoSet(raceTarget.files[0]);
+  }
+  const backupTarget = e.target.closest('[data-action="import-backup-input"]');
+  if (backupTarget && backupTarget.files[0]) {
+    importBackupFile(backupTarget.files[0]);
+    backupTarget.value = ''; // allow re-importing the same filename later
   }
 });
 
