@@ -144,8 +144,13 @@ function currentWeek() {
 }
 
 function weeklyKm() {
+  // "km this week" on Home is Strava-only (manual shoe-log entries have no
+  // `source` field), so it reflects actual recorded runs, not manual km edits.
   const wk = currentWeek();
-  return wk.days.reduce((a, d) => a + sumRunKmForDate(d.iso), 0);
+  const isoSet = new Set(wk.days.map((d) => d.iso));
+  return state.runLog
+    .filter((r) => r.source === 'strava' && isoSet.has(r.date))
+    .reduce((a, r) => a + r.km, 0);
 }
 
 // ---------------- header ----------------
