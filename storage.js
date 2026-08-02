@@ -18,6 +18,7 @@ function defaultState() {
     ],
     runLog: [], // {date, km, shoeId}
     prerace: { gear: false, electrolytes: false, banana: false, alarm: false },
+    equipmentChecklist: {}, // itemId -> bool, persistent (not daily-reset)
     customChecklist: [
       { id: 'mouthtape', label: 'Mouth tape', icon: 'ti ti-band-aid', tint: 'var(--teal)', tintSoft: 'var(--teal-soft)' },
       { id: 'stretch', label: 'Stretch / mobility', icon: 'ti ti-stretching', tint: 'var(--phase3)', tintSoft: 'rgba(122,63,91,0.14)' },

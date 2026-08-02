@@ -1,6 +1,6 @@
 import {
   PHASES, buildWeeks, currentWeekInfo, isoDate, MONTHS,
-  PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
+  PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay, EQUIPMENT_ITEMS,
   iconFor, RACE_DATE, addDays, daysBetween,
 } from './data.js';
 import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak, mergeWithDefaults } from './storage.js';
@@ -130,7 +130,10 @@ function chartSvg(values, w, h, color, gradId) {
 }
 
 function sumRunKmForDate(iso) {
-  return state.runLog.filter((r) => r.date === iso).reduce((a, r) => a + r.km, 0);
+  // Clamped at 0: a "remove km" correction can legitimately exceed what was
+  // logged on this specific day (e.g. correcting old over-logged mileage),
+  // which shouldn't render as a negative distance for that day.
+  return Math.max(0, state.runLog.filter((r) => r.date === iso).reduce((a, r) => a + r.km, 0));
 }
 
 function currentWeek() {
@@ -153,7 +156,7 @@ function renderHeader() {
     ['mobility', 'ti ti-stretching', 'Mobility'],
     ['supplements', 'ti ti-apple', 'Nutrition'],
     ['cycle', 'ti ti-moon-stars', 'Cycle'],
-    ['shoes', 'ti ti-shoe', 'Shoes'],
+    ['shoes', 'ti ti-shoe', 'Equipment'],
     ['race', 'ti ti-flag-2', 'Race Day'],
   ];
   return `
@@ -888,10 +891,14 @@ function renderCycle() {
 // ---------------- shoes ----------------
 
 function renderShoes() {
+  const groups = ['Shoes & Socks', 'Recovery', 'Accessories'];
+
   return `
   <div>
-    <div class="page-title" style="margin-bottom:4px;">Shoe tracker</div>
-    <div class="page-sub" style="margin-bottom:18px;">Rotate two pairs — retire at 500km.</div>
+    <div class="page-title" style="margin-bottom:4px;">Equipment</div>
+    <div class="page-sub" style="margin-bottom:18px;">Shoes, recovery tools, and race-day accessories.</div>
+
+    <div class="section-label">Shoes</div>
     <div class="shoes-grid">
       ${state.shoes.map((sh, i) => {
         const pct = Math.min(100, Math.round((sh.km / 500) * 100));
@@ -918,9 +925,33 @@ function renderShoes() {
             </div>
           </div>
           <div class="shoe-add">
-            <input placeholder="Add km" id="shoe-input-${sh.id}" inputmode="decimal">
+            <input placeholder="km" id="shoe-input-${sh.id}" inputmode="decimal">
             <button data-action="add-shoe-km" data-id="${sh.id}"><i class="ti ti-plus"></i>Log</button>
+            <button class="shoe-remove-btn" data-action="remove-shoe-km" data-id="${sh.id}"><i class="ti ti-minus"></i>Remove</button>
           </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section-label" style="margin-top:24px;">Recommended equipment</div>
+    <div class="page-sub" style="margin-bottom:14px;">From your training spec — check off what you've got.</div>
+    <div class="equipment-cols">
+      ${groups.map((group) => {
+        const groupItems = EQUIPMENT_ITEMS.filter((it) => it.group === group);
+        return `
+        <div>
+          <div class="supp-col-label" style="margin-bottom:8px;">${group}</div>
+          ${groupItems.map((it) => {
+            const done = !!state.equipmentChecklist[it.id];
+            return `
+            <div class="card equipment-row">
+              ${checkBtn({ done, small: true, action: 'toggle-equipment', id: it.id })}
+              <div class="equipment-row-body">
+                <div class="equipment-row-name">${esc(it.name)}</div>
+                <div class="equipment-row-note">${esc(it.note)}</div>
+              </div>
+            </div>`;
+          }).join('')}
         </div>`;
       }).join('')}
     </div>
@@ -1235,6 +1266,10 @@ function togglePrerace(id) {
   state.prerace = { ...state.prerace, [id]: !state.prerace[id] };
   persist(); render();
 }
+function toggleEquipmentItem(id) {
+  state.equipmentChecklist = { ...state.equipmentChecklist, [id]: !state.equipmentChecklist[id] };
+  persist(); render();
+}
 function addProtein(g) {
   const day = getDay(state, TODAY_ISO);
   setDay(state, TODAY_ISO, { proteinGrams: Math.max(0, day.proteinGrams + g) });
@@ -1310,8 +1345,21 @@ function addShoeKm(id) {
   if (!val || val <= 0) return;
   state.shoes = state.shoes.map((sh) => sh.id === id ? { ...sh, km: sh.km + val } : sh);
   state.runLog = [...state.runLog, { date: TODAY_ISO, km: val, shoeId: id }];
+  input.value = '';
   persist(); render();
   toast(`Logged ${val}km`);
+}
+function removeShoeKm(id) {
+  const input = document.getElementById(`shoe-input-${id}`);
+  const val = parseFloat(input.value);
+  if (!val || val <= 0) return;
+  state.shoes = state.shoes.map((sh) => sh.id === id ? { ...sh, km: Math.max(0, sh.km - val) } : sh);
+  // Offset the distance stats too (weeklyKm/Overview sum runLog directly),
+  // so a correction here doesn't leave shoe mileage and overall distance disagreeing.
+  state.runLog = [...state.runLog, { date: TODAY_ISO, km: -val, shoeId: id }];
+  input.value = '';
+  persist(); render();
+  toast(`Removed ${val}km`);
 }
 function shoePhotoPick(id) {
   document.getElementById(`shoe-file-${id}`).click();
@@ -1558,6 +1606,8 @@ document.addEventListener('click', (e) => {
     case 'import-backup-trigger': importBackupTrigger(); break;
     case 'report-period': ui.reportPeriod = target.dataset.period; render(); break;
     case 'add-shoe-km': addShoeKm(id); break;
+    case 'remove-shoe-km': removeShoeKm(id); break;
+    case 'toggle-equipment': toggleEquipmentItem(id); break;
     case 'shoe-photo': shoePhotoPick(id); break;
     case 'race-photo': racePhotoPick(); break;
     case 'refresh-oura': fetchOuraReadiness(true); fetchOuraSummary(true); break;

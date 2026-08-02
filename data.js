@@ -168,6 +168,33 @@ export const PRERACE_LABELS = {
   alarm: 'Alarm set — early wake for 5am start',
 };
 
+// Recommended equipment, from the training spec's Gear & Equipment section.
+// Checked state persists in state.equipmentChecklist (storage.js) -- this
+// list itself is the catalog, not per-item user data.
+export const EQUIPMENT_ITEMS = [
+  { id: 'injinji-socks', group: 'Shoes & Socks', name: 'Injinji toe socks', note: 'Separates toes, prevents bunion blisters, allows natural foot function.' },
+  { id: 'slant-board', group: 'Recovery', name: 'Slant board (calf raise step)', note: 'Eccentric calf raises — non-negotiable daily achilles protocol.' },
+  { id: 'lacrosse-ball', group: 'Recovery', name: 'Lacrosse ball (natural rubber)', note: 'Daily foot rolling, hip and glute release.' },
+  { id: 'foam-roller', group: 'Recovery', name: 'Foam roller (full length)', note: 'Thoracic spine before runs, IT band, calf, hip flexor.' },
+  { id: 'correct-toes', group: 'Recovery', name: 'Correct Toes spacers', note: 'Daily toe realignment, bunion management. Order from correcttoes.com.' },
+  { id: 'resistance-bands', group: 'Recovery', name: 'Resistance bands (loop set)', note: 'Hip abduction, clamshells, lateral walks, glute activation.' },
+  { id: 'dumbbells', group: 'Recovery', name: 'Light dumbbells (5–10 lb pair)', note: 'Single-leg RDLs, Bulgarian split squats, hip work.' },
+  { id: 'yoga-mat', group: 'Recovery', name: 'Yoga mat (natural rubber)', note: 'Daily mobility + Yoga Nidra. No PVC.' },
+  { id: 'yoga-blocks', group: 'Recovery', name: 'Yoga blocks (cork, set of 2)', note: '90/90, pigeon pose, hip flexor work.' },
+  { id: 'massage-gun', group: 'Recovery', name: 'Massage gun', note: 'Post-run calf and glute recovery, achilles area.' },
+  { id: 'compression-socks', group: 'Recovery', name: 'Compression socks (knee high)', note: 'After long runs and on travel days (Honolulu flights).' },
+  { id: 'epsom-salts', group: 'Recovery', name: 'Epsom salts (large bag)', note: 'Post-run foot soaks and full baths. Transdermal magnesium.' },
+  { id: 'ice-packs', group: 'Recovery', name: 'Reusable gel ice packs', note: 'Targeted icing if achilles or right foot is hot/swollen.' },
+  { id: 'wedge-pillow', group: 'Recovery', name: 'Leg elevation wedge pillow', note: 'Post-run lymph drainage and hip decompression nightly.' },
+  { id: 'mouth-tape', group: 'Accessories', name: 'Mouth tape (Hostage Tape)', note: 'Nightly use. Nasal breathing conversion.' },
+  { id: 'nasal-saline', group: 'Accessories', name: 'Nasal saline rinse (NeilMed)', note: 'Keeps nasal passages clear for nasal breathing training.' },
+  { id: 'nasal-strips', group: 'Accessories', name: 'Nasal dilator strips', note: 'High-intensity runs during nasal breathing adaptation.' },
+  { id: 'hydration-vest', group: 'Accessories', name: 'Running hydration vest', note: 'Needed from Phase 3 onward (runs over 90 min).' },
+  { id: 'running-hat', group: 'Accessories', name: 'Lightweight vented running hat', note: 'Sun protection for training and race day.' },
+  { id: 'moisture-kit', group: 'Accessories', name: 'Bamboo / moisture-wicking running kit', note: 'Anti-chafe, seamless. Matters after 16km+.' },
+  { id: 'body-glide', group: 'Accessories', name: 'Body Glide anti-chafe balm', note: 'Vegan formula. Thighs, underarms, sports bra line, toes.' },
+];
+
 export const CYCLE_DATA = {
   menstrual: { label: 'Menstrual', color: 'var(--coral)', soft: 'var(--coral-soft)', length: '"Winter" · days 1–5', note: '"Winter" — rest, iron-rich foods, gentle movement.', groups: [
     { name: 'Veggies', items: 'Kale, beets, mushrooms, sea veggies, sweet potato, root veggies' },
