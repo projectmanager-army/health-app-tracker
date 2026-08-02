@@ -1,5 +1,5 @@
 // Persistence layer — localStorage backed, real data (no fake/demo numbers).
-import { isoDate, addDays, MOBILITY_DEFAULTS, SUPPLEMENT_DEFAULTS } from './data.js';
+import { isoDate, addDays, MOBILITY_DEFAULTS, SUPPLEMENT_DEFAULTS, EQUIPMENT_DEFAULTS } from './data.js';
 
 const KEY = 'honolulu-tracker-v1';
 
@@ -19,6 +19,7 @@ function defaultState() {
     runLog: [], // {date, km, shoeId}
     prerace: { gear: false, electrolytes: false, banana: false, alarm: false },
     equipmentChecklist: {}, // itemId -> bool, persistent (not daily-reset)
+    customEquipment: EQUIPMENT_DEFAULTS.map((e) => ({ ...e })),
     customChecklist: [
       { id: 'mouthtape', label: 'Mouth tape', icon: 'ti ti-band-aid', tint: 'var(--teal)', tintSoft: 'var(--teal-soft)' },
       { id: 'stretch', label: 'Stretch / mobility', icon: 'ti ti-stretching', tint: 'var(--phase3)', tintSoft: 'rgba(122,63,91,0.14)' },

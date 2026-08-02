@@ -1,6 +1,6 @@
 import {
   PHASES, buildWeeks, currentWeekInfo, isoDate, MONTHS,
-  PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay, EQUIPMENT_ITEMS,
+  PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
   iconFor, RACE_DATE, addDays, daysBetween,
 } from './data.js';
 import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak, mergeWithDefaults } from './storage.js';
@@ -12,6 +12,8 @@ const ui = {
   editingMobilityId: null,    // null | 'new' | <id> — drives the mobility add/edit modal
   editingSupplementId: null,  // null | 'new' | <id> — drives the supplement add/edit modal
   editingSupplementSection: null, // which section a new supplement should default into
+  editingEquipmentId: null,   // null | 'new' | <id> — drives the equipment add/edit modal
+  editingEquipmentGroup: null, // which group a new equipment item should default into
   showColdHeat: false,
   showReadinessPopover: false,
   reportPeriod: 'week',
@@ -937,7 +939,7 @@ function renderShoes() {
     <div class="page-sub" style="margin-bottom:14px;">From your training spec — check off what you've got.</div>
     <div class="equipment-cols">
       ${groups.map((group) => {
-        const groupItems = EQUIPMENT_ITEMS.filter((it) => it.group === group);
+        const groupItems = state.customEquipment.filter((it) => it.group === group);
         return `
         <div>
           <div class="supp-col-label" style="margin-bottom:8px;">${group}</div>
@@ -946,12 +948,14 @@ function renderShoes() {
             return `
             <div class="card equipment-row">
               ${checkBtn({ done, small: true, action: 'toggle-equipment', id: it.id })}
-              <div class="equipment-row-body">
+              <div class="equipment-row-body" data-action="edit-equipment" data-id="${it.id}">
                 <div class="equipment-row-name">${esc(it.name)}</div>
                 <div class="equipment-row-note">${esc(it.note)}</div>
               </div>
+              <button class="row-edit-btn" data-action="edit-equipment" data-id="${it.id}"><i class="ti ti-pencil"></i></button>
             </div>`;
           }).join('')}
+          <button class="add-item-btn" data-action="edit-equipment" data-id="new" data-group="${group}"><i class="ti ti-plus"></i> Add</button>
         </div>`;
       }).join('')}
     </div>
@@ -1079,6 +1083,35 @@ function renderModals() {
         <div class="modal-actions">
           ${!isNew ? `<button class="modal-delete-btn" data-action="delete-supplement" data-id="${item.id}">Delete</button>` : '<span></span>'}
           <button class="quick-add-btn lg" data-action="save-supplement-edit">Save</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  if (ui.editingEquipmentId) {
+    const isNew = ui.editingEquipmentId === 'new';
+    const item = isNew
+      ? { id: null, name: '', note: '', group: ui.editingEquipmentGroup || 'Recovery' }
+      : (state.customEquipment.find((it) => it.id === ui.editingEquipmentId) || { id: null, name: '', note: '', group: 'Recovery' });
+    const groupOptions = ['Shoes & Socks', 'Recovery', 'Accessories'];
+    html += `
+    <div class="modal-overlay" data-action="close-equipment-edit">
+      <div class="modal" data-action="stop">
+        <div class="modal-head">
+          <div class="modal-title">${isNew ? 'Add equipment' : 'Edit equipment'}</div>
+          <button class="modal-close" data-action="close-equipment-edit"><i class="ti ti-x"></i></button>
+        </div>
+        <label class="form-label">Name</label>
+        <input type="text" id="equipment-edit-name" class="form-input" value="${esc(item.name)}" placeholder="e.g. Foam roller">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="equipment-edit-note" class="form-input" value="${esc(item.note || '')}" placeholder="What it's for">
+        <label class="form-label">Category</label>
+        <select id="equipment-edit-group" class="form-input">
+          ${groupOptions.map((g) => `<option value="${g}" ${item.group === g ? 'selected' : ''}>${g}</option>`).join('')}
+        </select>
+        <div class="modal-actions">
+          ${!isNew ? `<button class="modal-delete-btn" data-action="delete-equipment" data-id="${item.id}">Delete</button>` : '<span></span>'}
+          <button class="quick-add-btn lg" data-action="save-equipment-edit">Save</button>
         </div>
       </div>
     </div>`;
@@ -1269,6 +1302,35 @@ function togglePrerace(id) {
 function toggleEquipmentItem(id) {
   state.equipmentChecklist = { ...state.equipmentChecklist, [id]: !state.equipmentChecklist[id] };
   persist(); render();
+}
+function openEquipmentEdit(id, group) {
+  ui.editingEquipmentId = id;
+  ui.editingEquipmentGroup = group || null;
+  render();
+}
+function closeEquipmentEdit() {
+  ui.editingEquipmentId = null;
+  render();
+}
+function saveEquipmentEdit() {
+  const name = document.getElementById('equipment-edit-name').value.trim();
+  const note = document.getElementById('equipment-edit-note').value.trim();
+  const group = document.getElementById('equipment-edit-group').value;
+  if (!name) { toast('Name is required'); return; }
+  if (ui.editingEquipmentId === 'new') {
+    state.customEquipment = [...state.customEquipment, { id: 'equip-' + Date.now(), name, note, group }];
+  } else {
+    const id = ui.editingEquipmentId;
+    state.customEquipment = state.customEquipment.map((it) => it.id === id ? { ...it, name, note, group } : it);
+  }
+  ui.editingEquipmentId = null;
+  persist(); render();
+}
+function deleteEquipmentItem(id) {
+  state.customEquipment = state.customEquipment.filter((it) => it.id !== id);
+  ui.editingEquipmentId = null;
+  persist(); render();
+  toast('Deleted');
 }
 function addProtein(g) {
   const day = getDay(state, TODAY_ISO);
@@ -1556,7 +1618,7 @@ document.addEventListener('click', (e) => {
   switch (action) {
     case 'tab':
       ui.tab = target.dataset.tab;
-      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null;
+      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.editingEquipmentId = null;
       render();
       window.scrollTo({ top: 0, behavior: 'instant' });
       break;
@@ -1608,6 +1670,10 @@ document.addEventListener('click', (e) => {
     case 'add-shoe-km': addShoeKm(id); break;
     case 'remove-shoe-km': removeShoeKm(id); break;
     case 'toggle-equipment': toggleEquipmentItem(id); break;
+    case 'edit-equipment': openEquipmentEdit(id, target.dataset.group); break;
+    case 'close-equipment-edit': closeEquipmentEdit(); break;
+    case 'save-equipment-edit': saveEquipmentEdit(); break;
+    case 'delete-equipment': deleteEquipmentItem(id); break;
     case 'shoe-photo': shoePhotoPick(id); break;
     case 'race-photo': racePhotoPick(); break;
     case 'refresh-oura': fetchOuraReadiness(true); fetchOuraSummary(true); break;
@@ -1637,8 +1703,8 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (ui.selectedDay || ui.editingMobilityId || ui.editingSupplementId || ui.showColdHeat) {
-      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.showColdHeat = false;
+    if (ui.selectedDay || ui.editingMobilityId || ui.editingSupplementId || ui.editingEquipmentId || ui.showColdHeat) {
+      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.editingEquipmentId = null; ui.showColdHeat = false;
       render();
     }
   }

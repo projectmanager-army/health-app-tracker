@@ -168,10 +168,11 @@ export const PRERACE_LABELS = {
   alarm: 'Alarm set — early wake for 5am start',
 };
 
-// Recommended equipment, from the training spec's Gear & Equipment section.
-// Checked state persists in state.equipmentChecklist (storage.js) -- this
-// list itself is the catalog, not per-item user data.
-export const EQUIPMENT_ITEMS = [
+// Starting set for the user-editable equipment list (state.customEquipment in
+// storage.js), from the training spec's Gear & Equipment section. Just seed
+// data -- the user can add, edit, and delete from here on. Checked state
+// persists separately in state.equipmentChecklist.
+export const EQUIPMENT_DEFAULTS = [
   { id: 'injinji-socks', group: 'Shoes & Socks', name: 'Injinji toe socks', note: 'Separates toes, prevents bunion blisters, allows natural foot function.' },
   { id: 'slant-board', group: 'Recovery', name: 'Slant board (calf raise step)', note: 'Eccentric calf raises — non-negotiable daily achilles protocol.' },
   { id: 'lacrosse-ball', group: 'Recovery', name: 'Lacrosse ball (natural rubber)', note: 'Daily foot rolling, hip and glute release.' },
