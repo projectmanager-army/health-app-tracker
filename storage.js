@@ -1,5 +1,5 @@
 // Persistence layer — localStorage backed, real data (no fake/demo numbers).
-import { isoDate, addDays, MOBILITY_LABELS, PRERACE_LABELS } from './data.js';
+import { isoDate, addDays, MOBILITY_DEFAULTS, SUPPLEMENT_DEFAULTS } from './data.js';
 
 const KEY = 'honolulu-tracker-v1';
 
@@ -25,6 +25,8 @@ function defaultState() {
       { id: 'swim', label: 'Swim', icon: 'ti ti-swimming', tint: 'var(--phase2)', tintSoft: 'rgba(93,133,173,0.14)' },
       { id: 'run', label: 'Run', icon: 'ti ti-run', tint: 'var(--amber-text)', tintSoft: 'var(--amber-soft)' },
     ],
+    customMobility: MOBILITY_DEFAULTS.map((m) => ({ ...m })),
+    customSupplements: SUPPLEMENT_DEFAULTS.map((s) => ({ ...s })),
     daily: {}, // date -> { mobility:{id:bool}, mouthTape:bool, supplements:{id:bool}, checklist:{id:bool}, proteinGrams, waterMl, nasalToday, achillesToday }
     darkMode: true,
     racePhoto: null,

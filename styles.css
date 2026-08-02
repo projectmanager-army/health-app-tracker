@@ -354,6 +354,25 @@ button{cursor:pointer;}
 .modal-body{font-size:14px;line-height:1.6;}
 .modal-sub{font-size:12.5px;color:var(--sub);}
 
+/* add/edit forms inside modals (mobility, supplements) */
+.form-label{display:block;font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:0.04em;margin:14px 0 6px;}
+.form-label:first-of-type{margin-top:0;}
+.form-input{width:100%;border:0.5px solid var(--border);background:var(--surface2);border-radius:9px;
+  padding:9px 11px;font-size:13.5px;color:var(--text);font-family:inherit;}
+select.form-input{appearance:none;-webkit-appearance:none;}
+.form-textarea{resize:vertical;min-height:60px;line-height:1.5;}
+.modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;}
+.modal-delete-btn{border:none;background:transparent;color:var(--coral);font-size:12.5px;font-weight:600;padding:8px 4px;}
+
+/* small pencil-edit button on mobility/supplement rows */
+.row-edit-btn{border:none;background:var(--surface2);color:var(--sub);width:26px;height:26px;border-radius:8px;
+  flex:none;display:flex;align-items:center;justify-content:center;}
+.row-edit-btn i{font-size:12px;}
+
+/* "+ Add X" button used on Mobility and Nutrition tabs */
+.add-item-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;border:1px dashed var(--border);
+  background:transparent;color:var(--sub);border-radius:14px;padding:10px 0;font-size:12.5px;font-weight:600;margin-top:10px;}
+
 .coldheat-alert{display:flex;gap:10px;align-items:flex-start;background:var(--coral-soft);border-radius:12px;
   padding:12px 14px;margin-bottom:16px;}
 .coldheat-alert i{font-size:16px;color:var(--coral);margin-top:1px;}

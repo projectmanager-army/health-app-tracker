@@ -137,25 +137,29 @@ export function currentWeekInfo() {
   return { weekIdx: Math.floor(diff / 7), dayIdx: diff % 7 };
 }
 
-export const SUPP_INFO = {
-  omega3: { name: 'Algae-Based Omega-3', dose: '2g EPA+DHA daily', why: 'Anti-inflammatory, joint lubrication, mood support — same bioavailability as fish oil.', brand: 'Algae-sourced = genuinely cruelty-free. Skip fish oil entirely.', section: 'morning' },
-  d3k2: { name: 'Vitamin D3 + K2', dose: 'Per label, with fat', why: 'Bone density, immune support, mood. K2 directs calcium to bones not joints.', brand: 'D3 from lichen (vegan) — avoid lanolin-sourced D3.', section: 'morning' },
-  creatine: { name: 'Creatine Monohydrate', dose: '3–5g daily', why: 'Tendon health, brain fog, endurance support, mood regulation — emerging strong evidence.', brand: 'Creapure — 100% synthetic, vegan, no animal sourcing.', section: 'morning' },
-  collagen: { name: 'Marine Collagen + Vitamin C', dose: '20g + 200mg Vit C, 30–40 min before runs', why: 'Tendon and ligament repair — especially the achilles. Evidence-backed synthesis window.', brand: 'Marine (not bovine) = no animal slaughter testing.', section: 'prerun', hasReminder: true },
-  electrolytes: { name: 'Electrolytes', dose: 'Runs over 60 min + race week', why: 'Sodium, potassium, magnesium — critical in Honolulu heat.', brand: 'LMNT or Redmond Re-Lyte — no artificial dyes or sweeteners.', section: 'prerun' },
-  magnesium: { name: 'Magnesium Glycinate', dose: '300–400mg nightly', why: 'Muscle recovery, tendon health, sleep depth, nervous system — heavily depleted by endurance training.', brand: 'Thorne or Pure Encapsulations. No fillers.', section: 'nightly' },
-  zinc: { name: 'Zinc Bisglycinate', dose: '15–25mg nightly', why: 'Counterbalances copper IUD effect, depleted by endurance training.', brand: 'Thorne or Pure Encapsulations. Take away from copper-rich foods.', section: 'nightly' },
-  tartcherry: { name: 'Tart Cherry Extract', dose: '480mg before sleep, hard days', why: 'Natural COX-2 inhibitor — reduces DOMS without blunting adaptation.', brand: 'Plant-based. No testing concerns.', section: 'nightly' },
-};
+// Starting sets for the user-editable mobility/supplement lists (state.customMobility
+// / state.customSupplements in storage.js). These are just the initial defaults --
+// the user can add, edit, and delete items from here on, so treat this as seed data,
+// not a fixed catalog.
+export const SUPPLEMENT_DEFAULTS = [
+  { id: 'omega3', name: 'Algae-Based Omega-3', dose: '2g EPA+DHA daily', why: 'Anti-inflammatory, joint lubrication, mood support — same bioavailability as fish oil.', brand: 'Algae-sourced = genuinely cruelty-free. Skip fish oil entirely.', section: 'morning' },
+  { id: 'd3k2', name: 'Vitamin D3 + K2', dose: 'Per label, with fat', why: 'Bone density, immune support, mood. K2 directs calcium to bones not joints.', brand: 'D3 from lichen (vegan) — avoid lanolin-sourced D3.', section: 'morning' },
+  { id: 'creatine', name: 'Creatine Monohydrate', dose: '3–5g daily', why: 'Tendon health, brain fog, endurance support, mood regulation — emerging strong evidence.', brand: 'Creapure — 100% synthetic, vegan, no animal sourcing.', section: 'morning' },
+  { id: 'collagen', name: 'Marine Collagen + Vitamin C', dose: '20g + 200mg Vit C, 30–40 min before runs', why: 'Tendon and ligament repair — especially the achilles. Evidence-backed synthesis window.', brand: 'Marine (not bovine) = no animal slaughter testing.', section: 'prerun', hasReminder: true },
+  { id: 'electrolytes', name: 'Electrolytes', dose: 'Runs over 60 min + race week', why: 'Sodium, potassium, magnesium — critical in Honolulu heat.', brand: 'LMNT or Redmond Re-Lyte — no artificial dyes or sweeteners.', section: 'prerun' },
+  { id: 'magnesium', name: 'Magnesium Glycinate', dose: '300–400mg nightly', why: 'Muscle recovery, tendon health, sleep depth, nervous system — heavily depleted by endurance training.', brand: 'Thorne or Pure Encapsulations. No fillers.', section: 'nightly' },
+  { id: 'zinc', name: 'Zinc Bisglycinate', dose: '15–25mg nightly', why: 'Counterbalances copper IUD effect, depleted by endurance training.', brand: 'Thorne or Pure Encapsulations. Take away from copper-rich foods.', section: 'nightly' },
+  { id: 'tartcherry', name: 'Tart Cherry Extract', dose: '480mg before sleep, hard days', why: 'Natural COX-2 inhibitor — reduces DOMS without blunting adaptation.', brand: 'Plant-based. No testing concerns.', section: 'nightly' },
+];
 
-export const MOBILITY_LABELS = {
-  calfRaises: ['Eccentric calf raises', '3×15, slow 3-count down', 'ti ti-stairs-up', 'var(--teal)'],
-  hipRotations: ['90/90 hip rotations', '2 min each side', 'ti ti-rotate', 'var(--phase2)'],
-  pigeonPose: ['Pigeon pose', '90 sec each side', 'ti ti-yoga', 'var(--phase3)'],
-  footRolling: ['Foot rolling', 'Lacrosse ball under the arch', 'ti ti-circle-dot', 'var(--coral)'],
-  toeSpacers: ['Toe spacers', '30 min wear', 'ti ti-shoe', '#20221E'],
-  legsUpWall: ['Legs up the wall', '10 min', 'ti ti-arrow-big-up-lines', 'var(--teal)'],
-};
+export const MOBILITY_DEFAULTS = [
+  { id: 'calfRaises', name: 'Eccentric calf raises', sub: '3×15, slow 3-count down', icon: 'ti ti-stairs-up', color: 'var(--teal)' },
+  { id: 'hipRotations', name: '90/90 hip rotations', sub: '2 min each side', icon: 'ti ti-rotate', color: 'var(--phase2)' },
+  { id: 'pigeonPose', name: 'Pigeon pose', sub: '90 sec each side', icon: 'ti ti-yoga', color: 'var(--phase3)' },
+  { id: 'footRolling', name: 'Foot rolling', sub: 'Lacrosse ball under the arch', icon: 'ti ti-circle-dot', color: 'var(--coral)' },
+  { id: 'toeSpacers', name: 'Toe spacers', sub: '30 min wear', icon: 'ti ti-shoe', color: '#20221E' },
+  { id: 'legsUpWall', name: 'Legs up the wall', sub: '10 min', icon: 'ti ti-arrow-big-up-lines', color: 'var(--teal)' },
+];
 
 export const PRERACE_LABELS = {
   gear: 'Lay out all race-day gear',

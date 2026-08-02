@@ -1,6 +1,6 @@
 import {
   PHASES, buildWeeks, currentWeekInfo, isoDate, MONTHS,
-  SUPP_INFO, MOBILITY_LABELS, PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
+  PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
   iconFor, RACE_DATE, addDays, daysBetween,
 } from './data.js';
 import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak, mergeWithDefaults } from './storage.js';
@@ -9,7 +9,9 @@ let state = load();
 const ui = {
   tab: 'home',
   selectedDay: null,     // {week, label, type, detail}
-  selectedSupp: null,    // supp info object
+  editingMobilityId: null,    // null | 'new' | <id> — drives the mobility add/edit modal
+  editingSupplementId: null,  // null | 'new' | <id> — drives the supplement add/edit modal
+  editingSupplementSection: null, // which section a new supplement should default into
   showColdHeat: false,
   showReadinessPopover: false,
   reportPeriod: 'week',
@@ -365,7 +367,7 @@ function renderHome() {
   const dots = Array.from({ length: 28 }, (_, i) => `<div class="cycle-dot" style="background:${i + 1 === cycleDayNum ? cyclePhase.color : 'var(--surface2)'};"></div>`).join('');
 
   const km = weeklyKm();
-  const mobilityDoneCount = Object.keys(MOBILITY_LABELS).filter((id) => day.mobility[id]).length;
+  const mobilityDoneCount = state.customMobility.filter((m) => day.mobility[m.id]).length;
 
   return `
   <div>
@@ -402,7 +404,7 @@ function renderHome() {
       </div>
       <div class="card link-card" data-action="tab" data-tab="mobility">
         <div class="link-card-head"><div>Mobility today</div><i class="ti ti-arrow-up-right"></i></div>
-        <div class="link-card-num">${mobilityDoneCount}/6</div>
+        <div class="link-card-num">${mobilityDoneCount}/${state.customMobility.length}</div>
         <div class="link-card-sub">non-negotiables done</div>
       </div>
     </div>
@@ -475,8 +477,8 @@ function buildReport(period) {
   const effectiveDays = Math.min(days, daysSinceFirstUse());
   let totalKm = 0, totalWater = 0, totalProtein = 0, mobilitySum = 0, suppSum = 0, checklistSum = 0;
   const dayBars = [];
-  const mobilityCount = Object.keys(MOBILITY_LABELS).length;
-  const suppCount = Object.keys(SUPP_INFO).length;
+  const mobilityCount = Math.max(1, state.customMobility.length);
+  const suppCount = Math.max(1, state.customSupplements.length);
   const checklistCount = Math.max(1, state.customChecklist.length);
 
   for (let i = 0; i < days; i++) {
@@ -652,22 +654,23 @@ function renderPlan() {
 
 function renderMobility() {
   const day = getDay(state, TODAY_ISO);
-  const doneCount = Object.keys(MOBILITY_LABELS).filter((id) => day.mobility[id]).length;
-  const missed = Math.max(0, 6 - doneCount);
+  const total = state.customMobility.length;
+  const doneCount = state.customMobility.filter((m) => day.mobility[m.id]).length;
+  const missed = Math.max(0, total - doneCount);
 
-  const items = Object.keys(MOBILITY_LABELS).map((id) => {
-    const [name, sub, icon, color] = MOBILITY_LABELS[id];
-    const done = !!day.mobility[id];
-    const streak = mobilityStreak(state, id);
+  const items = state.customMobility.map((m) => {
+    const done = !!day.mobility[m.id];
+    const streak = mobilityStreak(state, m.id);
     return `
-      <div class="card mobility-row" data-action="toggle-mobility" data-id="${id}">
-        <div class="mobility-icon-wrap">${gradIcon(icon, color, 'var(--coral)', 42)}</div>
-        <div style="flex:1;">
-          <div class="mobility-name">${esc(name)}</div>
-          <div class="mobility-sub">${esc(sub)}</div>
+      <div class="card mobility-row" data-action="toggle-mobility" data-id="${m.id}">
+        <div class="mobility-icon-wrap">${gradIcon(m.icon, m.color, 'var(--coral)', 42)}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="mobility-name">${esc(m.name)}</div>
+          <div class="mobility-sub">${esc(m.sub)}</div>
         </div>
-        ${checkBtn({ done, action: 'toggle-mobility', id })}
-        <div class="mobility-streak"><i class="ti ti-flame" style="color:${color};"></i>${streak}</div>
+        <button class="row-edit-btn" data-action="edit-mobility" data-id="${m.id}"><i class="ti ti-pencil"></i></button>
+        ${checkBtn({ done, action: 'toggle-mobility', id: m.id })}
+        <div class="mobility-streak"><i class="ti ti-flame" style="color:${m.color};"></i>${streak}</div>
       </div>`;
   }).join('');
 
@@ -680,6 +683,7 @@ function renderMobility() {
     <div class="page-sub" style="margin-bottom:18px;">The achilles, hips and breathing work — non-negotiable.</div>
     ${missed > 0 ? `<div class="missed-note"><i class="ti ti-mood-neutral"></i>You have ${missed} item${missed === 1 ? '' : 's'} left today — no worries, just pick back up.</div>` : ''}
     <div class="mobility-grid">${items}</div>
+    <button class="add-item-btn" data-action="edit-mobility" data-id="new"><i class="ti ti-plus"></i> Add mobility item</button>
     <div class="nightly-label">Nightly</div>
     <div class="card nightly-row" data-action="toggle-mouthtape">
       ${checkBtn({ done: mtDone, action: 'toggle-mouthtape' })}
@@ -728,24 +732,23 @@ function renderSupplements() {
   const proteinPct = (day.proteinGrams / 110) * 100;
   const waterPct = (day.waterMl / 2200) * 100;
 
-  const suppRow = (id) => {
-    const info = SUPP_INFO[id];
-    const done = !!day.supplements[id];
+  const suppRow = (supp) => {
+    const done = !!day.supplements[supp.id];
     return `
       <div class="card supp-row">
-        ${checkBtn({ done, small: true, action: 'toggle-supp', id })}
-        <div class="supp-row-body" data-action="open-supp" data-id="${id}">
-          <div class="supp-row-name">${esc(info.name)}</div>
-          <div class="supp-row-dose">${esc(info.dose)}</div>
-          ${info.hasReminder ? `<div class="supp-reminder"><i class="ti ti-bell"></i> reminder 40 min before runs</div>` : ''}
+        ${checkBtn({ done, small: true, action: 'toggle-supp', id: supp.id })}
+        <div class="supp-row-body" data-action="edit-supplement" data-id="${supp.id}">
+          <div class="supp-row-name">${esc(supp.name)}</div>
+          <div class="supp-row-dose">${esc(supp.dose)}</div>
+          ${supp.hasReminder ? `<div class="supp-reminder"><i class="ti ti-bell"></i> reminder 40 min before runs</div>` : ''}
         </div>
-        <i class="ti ti-leaf" style="color:var(--teal);"></i>
+        <button class="row-edit-btn" data-action="edit-supplement" data-id="${supp.id}"><i class="ti ti-pencil"></i></button>
       </div>`;
   };
 
-  const morning = Object.keys(SUPP_INFO).filter((id) => SUPP_INFO[id].section === 'morning');
-  const prerun = Object.keys(SUPP_INFO).filter((id) => SUPP_INFO[id].section === 'prerun');
-  const nightly = Object.keys(SUPP_INFO).filter((id) => SUPP_INFO[id].section === 'nightly');
+  const morning = state.customSupplements.filter((s) => s.section === 'morning');
+  const prerun = state.customSupplements.filter((s) => s.section === 'prerun');
+  const nightly = state.customSupplements.filter((s) => s.section === 'nightly');
 
   return `
   <div>
@@ -810,14 +813,17 @@ function renderSupplements() {
       <div>
         <div class="supp-col-head"><span class="supp-col-dot" style="background:var(--amber-text);"></span><div class="supp-col-label">Morning</div></div>
         ${morning.map(suppRow).join('')}
+        <button class="add-item-btn" data-action="edit-supplement" data-id="new" data-section="morning"><i class="ti ti-plus"></i> Add</button>
       </div>
       <div>
         <div class="supp-col-head"><span class="supp-col-dot" style="background:var(--phase2);"></span><div class="supp-col-label">Pre-run</div></div>
         ${prerun.map(suppRow).join('')}
+        <button class="add-item-btn" data-action="edit-supplement" data-id="new" data-section="prerun"><i class="ti ti-plus"></i> Add</button>
       </div>
       <div>
         <div class="supp-col-head"><span class="supp-col-dot" style="background:var(--phase3);"></span><div class="supp-col-label">Nightly</div></div>
         ${nightly.map(suppRow).join('')}
+        <button class="add-item-btn" data-action="edit-supplement" data-id="new" data-section="nightly"><i class="ti ti-plus"></i> Add</button>
       </div>
     </div>
   </div>`;
@@ -990,17 +996,59 @@ function renderModals() {
     </div>`;
   }
 
-  if (ui.selectedSupp) {
-    const s = ui.selectedSupp;
+  if (ui.editingMobilityId) {
+    const isNew = ui.editingMobilityId === 'new';
+    const item = isNew
+      ? { id: null, name: '', sub: '' }
+      : (state.customMobility.find((m) => m.id === ui.editingMobilityId) || { id: null, name: '', sub: '' });
     html += `
-    <div class="modal-overlay" data-action="close-supp">
+    <div class="modal-overlay" data-action="close-mobility-edit">
       <div class="modal" data-action="stop">
         <div class="modal-head">
-          <div class="modal-title">${esc(s.name)}</div>
-          <button class="modal-close" data-action="close-supp"><i class="ti ti-x"></i></button>
+          <div class="modal-title">${isNew ? 'Add mobility item' : 'Edit mobility item'}</div>
+          <button class="modal-close" data-action="close-mobility-edit"><i class="ti ti-x"></i></button>
         </div>
-        <div class="modal-body" style="margin-bottom:10px;">${esc(s.why)}</div>
-        <div class="modal-sub">${esc(s.brand)}</div>
+        <label class="form-label">Name</label>
+        <input type="text" id="mobility-edit-name" class="form-input" value="${esc(item.name)}" placeholder="e.g. Ankle circles">
+        <label class="form-label">Details</label>
+        <input type="text" id="mobility-edit-sub" class="form-input" value="${esc(item.sub)}" placeholder="e.g. 2 min each side">
+        <div class="modal-actions">
+          ${!isNew ? `<button class="modal-delete-btn" data-action="delete-mobility" data-id="${item.id}">Delete</button>` : '<span></span>'}
+          <button class="quick-add-btn lg" data-action="save-mobility-edit">Save</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  if (ui.editingSupplementId) {
+    const isNew = ui.editingSupplementId === 'new';
+    const item = isNew
+      ? { id: null, name: '', dose: '', why: '', brand: '', section: ui.editingSupplementSection || 'morning' }
+      : (state.customSupplements.find((s) => s.id === ui.editingSupplementId) || { id: null, name: '', dose: '', why: '', brand: '', section: 'morning' });
+    const sections = [['morning', 'Morning'], ['prerun', 'Pre-run'], ['nightly', 'Nightly']];
+    html += `
+    <div class="modal-overlay" data-action="close-supplement-edit">
+      <div class="modal" data-action="stop">
+        <div class="modal-head">
+          <div class="modal-title">${isNew ? 'Add supplement' : 'Edit supplement'}</div>
+          <button class="modal-close" data-action="close-supplement-edit"><i class="ti ti-x"></i></button>
+        </div>
+        <label class="form-label">Name</label>
+        <input type="text" id="supp-edit-name" class="form-input" value="${esc(item.name)}" placeholder="e.g. Vitamin C">
+        <label class="form-label">Dose</label>
+        <input type="text" id="supp-edit-dose" class="form-input" value="${esc(item.dose)}" placeholder="e.g. 500mg daily">
+        <label class="form-label">Timing</label>
+        <select id="supp-edit-section" class="form-input">
+          ${sections.map(([val, label]) => `<option value="${val}" ${item.section === val ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+        <label class="form-label">Why (optional)</label>
+        <textarea id="supp-edit-why" class="form-input form-textarea" placeholder="Why you're taking this">${esc(item.why || '')}</textarea>
+        <label class="form-label">Brand / notes (optional)</label>
+        <input type="text" id="supp-edit-brand" class="form-input" value="${esc(item.brand || '')}" placeholder="e.g. Thorne">
+        <div class="modal-actions">
+          ${!isNew ? `<button class="modal-delete-btn" data-action="delete-supplement" data-id="${item.id}">Delete</button>` : '<span></span>'}
+          <button class="quick-add-btn lg" data-action="save-supplement-edit">Save</button>
+        </div>
       </div>
     </div>`;
   }
@@ -1112,6 +1160,71 @@ function toggleSupp(id) {
   const day = getDay(state, TODAY_ISO);
   setDay(state, TODAY_ISO, { supplements: { ...day.supplements, [id]: !day.supplements[id] } });
   persist(); render();
+}
+
+// ---------------- mobility / supplement add & edit ----------------
+
+const ITEM_COLOR_PALETTE = ['var(--teal)', 'var(--phase2)', 'var(--phase3)', 'var(--coral)', 'var(--amber-text)'];
+
+function openMobilityEdit(id) {
+  ui.editingMobilityId = id;
+  render();
+}
+function closeMobilityEdit() {
+  ui.editingMobilityId = null;
+  render();
+}
+function saveMobilityEdit() {
+  const name = document.getElementById('mobility-edit-name').value.trim();
+  const sub = document.getElementById('mobility-edit-sub').value.trim();
+  if (!name) { toast('Name is required'); return; }
+  if (ui.editingMobilityId === 'new') {
+    const color = ITEM_COLOR_PALETTE[state.customMobility.length % ITEM_COLOR_PALETTE.length];
+    state.customMobility = [...state.customMobility, { id: 'mob-' + Date.now(), name, sub, icon: 'ti ti-circle-check', color }];
+  } else {
+    const id = ui.editingMobilityId;
+    state.customMobility = state.customMobility.map((m) => m.id === id ? { ...m, name, sub } : m);
+  }
+  ui.editingMobilityId = null;
+  persist(); render();
+}
+function deleteMobility(id) {
+  state.customMobility = state.customMobility.filter((m) => m.id !== id);
+  ui.editingMobilityId = null;
+  persist(); render();
+  toast('Deleted');
+}
+
+function openSupplementEdit(id, section) {
+  ui.editingSupplementId = id;
+  ui.editingSupplementSection = section || null;
+  render();
+}
+function closeSupplementEdit() {
+  ui.editingSupplementId = null;
+  render();
+}
+function saveSupplementEdit() {
+  const name = document.getElementById('supp-edit-name').value.trim();
+  const dose = document.getElementById('supp-edit-dose').value.trim();
+  const section = document.getElementById('supp-edit-section').value;
+  const why = document.getElementById('supp-edit-why').value.trim();
+  const brand = document.getElementById('supp-edit-brand').value.trim();
+  if (!name) { toast('Name is required'); return; }
+  if (ui.editingSupplementId === 'new') {
+    state.customSupplements = [...state.customSupplements, { id: 'supp-' + Date.now(), name, dose, why, brand, section }];
+  } else {
+    const id = ui.editingSupplementId;
+    state.customSupplements = state.customSupplements.map((s) => s.id === id ? { ...s, name, dose, why, brand, section } : s);
+  }
+  ui.editingSupplementId = null;
+  persist(); render();
+}
+function deleteSupplement(id) {
+  state.customSupplements = state.customSupplements.filter((s) => s.id !== id);
+  ui.editingSupplementId = null;
+  persist(); render();
+  toast('Deleted');
 }
 function toggleChecklist(id) {
   const day = getDay(state, TODAY_ISO);
@@ -1395,7 +1508,7 @@ document.addEventListener('click', (e) => {
   switch (action) {
     case 'tab':
       ui.tab = target.dataset.tab;
-      ui.selectedDay = null; ui.selectedSupp = null;
+      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null;
       render();
       window.scrollTo({ top: 0, behavior: 'instant' });
       break;
@@ -1407,8 +1520,14 @@ document.addEventListener('click', (e) => {
     case 'toggle-mobility': toggleMobility(id); break;
     case 'toggle-mouthtape': toggleMouthTape(); break;
     case 'toggle-supp': toggleSupp(id); break;
-    case 'open-supp': ui.selectedSupp = SUPP_INFO[id]; render(); break;
-    case 'close-supp': ui.selectedSupp = null; render(); break;
+    case 'edit-mobility': openMobilityEdit(id); break;
+    case 'close-mobility-edit': closeMobilityEdit(); break;
+    case 'save-mobility-edit': saveMobilityEdit(); break;
+    case 'delete-mobility': deleteMobility(id); break;
+    case 'edit-supplement': openSupplementEdit(id, target.dataset.section); break;
+    case 'close-supplement-edit': closeSupplementEdit(); break;
+    case 'save-supplement-edit': saveSupplementEdit(); break;
+    case 'delete-supplement': deleteSupplement(id); break;
     case 'toggle-checklist': toggleChecklist(id); break;
     case 'add-checklist': doAddChecklist(); break;
     case 'toggle-prerace': togglePrerace(id); break;
@@ -1468,8 +1587,8 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (ui.selectedDay || ui.selectedSupp || ui.showColdHeat) {
-      ui.selectedDay = null; ui.selectedSupp = null; ui.showColdHeat = false;
+    if (ui.selectedDay || ui.editingMobilityId || ui.editingSupplementId || ui.showColdHeat) {
+      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.showColdHeat = false;
       render();
     }
   }
