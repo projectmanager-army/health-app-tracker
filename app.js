@@ -319,9 +319,9 @@ function renderOuraHeroCard() {
   }
 
   const rows = [
-    { label: 'Readiness', value: s.readiness?.score, icon: 'ti ti-heartbeat' },
-    { label: 'Sleep', value: s.sleep?.score, icon: 'ti ti-moon' },
-    { label: 'Activity', value: s.activity?.score, icon: 'ti ti-flame' },
+    { label: 'Readiness', value: s.readiness?.score, icon: 'ti ti-device-heart-monitor', color: 'var(--teal)' },
+    { label: 'Sleep', value: s.sleep?.score, icon: 'ti ti-moon', color: 'var(--phase2)' },
+    { label: 'Activity', value: s.activity?.score, icon: 'ti ti-flame', color: 'var(--coral)' },
   ];
 
   return `<div class="oura-hero-card">
@@ -331,7 +331,7 @@ function renderOuraHeroCard() {
     </div>
     ${rows.map((r) => `
       <div class="oura-hero-row">
-        <div class="oura-hero-row-left"><i class="${r.icon}"></i><span>${r.label.toUpperCase()}</span></div>
+        <div class="oura-hero-row-left"><i class="${r.icon}" style="color:${r.color};"></i><span>${r.label.toUpperCase()}</span></div>
         <div class="oura-hero-row-value">${r.value != null ? r.value : '—'}</div>
       </div>`).join('')}
   </div>`;
