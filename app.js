@@ -32,6 +32,7 @@ const ui = {
   coachInput: '',
   coachLoading: false,
   coachError: null,  // 'no_config' | 'unauthorized' | 'network' | null
+  viewDate: today(),  // which day's log (mobility/supplements/water/protein/checklist) is being viewed/edited
 };
 
 const WEEKS = buildWeeks();
@@ -68,6 +69,38 @@ function currentCycleDay() {
     return ((diff % 28) + 28) % 28 + 1;
   }
   return state.cycleDay || 1;
+}
+
+// How far back you can navigate to backfill a missed day -- generous enough
+// for "forgot to log yesterday" catch-up without turning into an open-ended
+// history editor.
+const VIEW_DATE_LOOKBACK_DAYS = 60;
+
+function isViewingToday() {
+  return ui.viewDate === TODAY_ISO;
+}
+
+function viewDateLabel() {
+  const d = new Date(ui.viewDate + 'T00:00:00');
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function dayPill() {
+  return isViewingToday() ? '' : ` <span class="day-pill">${viewDateLabel()}</span>`;
+}
+
+function navDay(delta) {
+  const iso = isoDate(addDays(new Date(ui.viewDate + 'T00:00:00'), delta));
+  const minIso = isoDate(addDays(new Date(TODAY_ISO + 'T00:00:00'), -VIEW_DATE_LOOKBACK_DAYS));
+  if (iso > TODAY_ISO || iso < minIso) return;
+  ui.viewDate = iso;
+  render();
+}
+
+function jumpToToday() {
+  if (isViewingToday()) return;
+  ui.viewDate = TODAY_ISO;
+  render();
 }
 
 function getReadiness() {
@@ -284,15 +317,28 @@ function renderSidebar() {
   const { dayIdx } = currentWeekInfo();
   const todayDay = wk.days[dayIdx];
   const readiness = getReadiness();
-  const day = getDay(state, TODAY_ISO);
+  const day = getDay(state, ui.viewDate);
 
   const checklist = state.customChecklist.map((item) => ({
     ...item,
     done: !!day.checklist[item.id],
   }));
 
+  const atMin = ui.viewDate <= isoDate(addDays(new Date(TODAY_ISO + 'T00:00:00'), -VIEW_DATE_LOOKBACK_DAYS));
+  const atMax = isViewingToday();
+
   return `
   <div class="sidebar">
+    <div class="card daynav-card">
+      <button class="daynav-arrow" data-action="day-prev" ${atMin ? 'disabled' : ''}><i class="ti ti-chevron-left"></i></button>
+      <div class="daynav-label">
+        <div class="daynav-eyebrow">Logging for</div>
+        <div class="daynav-date">${isViewingToday() ? 'Today' : viewDateLabel()}</div>
+      </div>
+      <button class="daynav-arrow" data-action="day-next" ${atMax ? 'disabled' : ''}><i class="ti ti-chevron-right"></i></button>
+    </div>
+    ${!isViewingToday() ? `<button class="daynav-today-btn" data-action="day-today"><i class="ti ti-calendar-event"></i> Jump back to today</button>` : ''}
+
     <div class="card countdown-card">
       <div class="blob" style="width:140px;height:140px;background:var(--teal);filter:blur(30px);opacity:0.35;top:-50px;left:-40px;"></div>
       <div class="blob" style="width:120px;height:120px;background:var(--coral);filter:blur(30px);opacity:0.3;bottom:-40px;right:-30px;"></div>
@@ -318,7 +364,7 @@ function renderSidebar() {
     </div>
 
     <div class="card card-pad-sm">
-      <div class="checklist-title">Daily checklist</div>
+      <div class="checklist-title">Daily checklist${dayPill()}</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${checklist.map((item) => `
           <div class="checklist-row" data-action="toggle-checklist" data-id="${item.id}">
@@ -416,7 +462,7 @@ function renderHomeSideCol(wk, km) {
 
 function renderHome() {
   const wk = currentWeek();
-  const day = getDay(state, TODAY_ISO);
+  const day = getDay(state, ui.viewDate);
   const now = new Date();
   const todayLabel = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const { weekIdx } = currentWeekInfo();
@@ -462,7 +508,7 @@ function renderHome() {
         ${chartSvg(WEEKS.map((w) => w.barPct), 300, 90, 'var(--teal)', 'lrGrad')}
       </div>
       <div class="card link-card" data-action="tab" data-tab="mobility">
-        <div class="link-card-head"><div>Mobility today</div><i class="ti ti-arrow-up-right"></i></div>
+        <div class="link-card-head"><div>Mobility ${isViewingToday() ? 'today' : viewDateLabel()}</div><i class="ti ti-arrow-up-right"></i></div>
         <div class="link-card-num">${mobilityDoneCount}/${state.customMobility.length}</div>
         <div class="link-card-sub">non-negotiables done</div>
       </div>
@@ -472,7 +518,7 @@ function renderHome() {
       <div class="card ring-card">
         ${ring(70, 7, (day.waterMl / 2200) * 100, 'var(--phase2)')}
         <div style="flex:1;">
-          <div class="ring-card-title">Water</div>
+          <div class="ring-card-title">Water${dayPill()}</div>
           <div class="ring-card-sub">${day.waterMl}ml of 2200ml</div>
           <div class="quick-adds">
             <button class="quick-add-btn" data-action="add-water" data-ml="250">+250ml</button>
@@ -484,7 +530,7 @@ function renderHome() {
       <div class="card ring-card">
         ${ring(70, 7, (day.proteinGrams / 110) * 100, 'var(--teal)')}
         <div style="flex:1;">
-          <div class="ring-card-title">Protein</div>
+          <div class="ring-card-title">Protein${dayPill()}</div>
           <div class="ring-card-sub">${day.proteinGrams}g of 110g</div>
           <div class="quick-adds">
             <button class="quick-add-btn" data-action="add-protein" data-g="7">+ Egg</button>
@@ -712,7 +758,7 @@ function renderPlan() {
 // ---------------- mobility ----------------
 
 function renderMobility() {
-  const day = getDay(state, TODAY_ISO);
+  const day = getDay(state, ui.viewDate);
   const total = state.customMobility.length;
   const doneCount = state.customMobility.filter((m) => day.mobility[m.id]).length;
   const missed = Math.max(0, total - doneCount);
@@ -738,9 +784,9 @@ function renderMobility() {
 
   return `
   <div>
-    <div class="page-title" style="margin-bottom:4px;">Daily mobility</div>
+    <div class="page-title" style="margin-bottom:4px;">Daily mobility${dayPill()}</div>
     <div class="page-sub" style="margin-bottom:18px;">The achilles, hips and breathing work — non-negotiable.</div>
-    ${missed > 0 ? `<div class="missed-note"><i class="ti ti-mood-neutral"></i>You have ${missed} item${missed === 1 ? '' : 's'} left today — no worries, just pick back up.</div>` : ''}
+    ${missed > 0 ? `<div class="missed-note"><i class="ti ti-mood-neutral"></i>You have ${missed} item${missed === 1 ? '' : 's'} left ${isViewingToday() ? 'today' : `for ${viewDateLabel()}`} — no worries, just pick back up.</div>` : ''}
     <div class="mobility-grid">${items}</div>
     <button class="add-item-btn" data-action="edit-mobility" data-id="new"><i class="ti ti-plus"></i> Add mobility item</button>
     <div class="nightly-label">Nightly</div>
@@ -787,7 +833,7 @@ function renderProteinLookupResult() {
 }
 
 function renderSupplements() {
-  const day = getDay(state, TODAY_ISO);
+  const day = getDay(state, ui.viewDate);
   const proteinPct = (day.proteinGrams / 110) * 100;
   const waterPct = (day.waterMl / 2200) * 100;
 
@@ -811,13 +857,13 @@ function renderSupplements() {
 
   return `
   <div>
-    <div class="page-title" style="margin-bottom:4px;">Nutrition</div>
+    <div class="page-title" style="margin-bottom:4px;">Nutrition${dayPill()}</div>
     <div class="page-sub" style="margin-bottom:18px;">Water, protein, and the cruelty-free supplement stack — click any item to see why it's there.</div>
 
     <div class="card supp-hero">
       ${ring(76, 8, proteinPct, 'var(--teal)')}
       <div style="flex:1;min-width:0;">
-        <div class="supp-hero-title">Protein today</div>
+        <div class="supp-hero-title">Protein ${isViewingToday() ? 'today' : viewDateLabel()}</div>
         <div class="supp-hero-sub">${day.proteinGrams}g of 110g target — recovery &amp; tendon repair.</div>
         <div class="quick-adds">
           <button class="quick-add-btn lg" data-action="add-protein" data-g="7">+ Egg (7g)</button>
@@ -852,7 +898,7 @@ function renderSupplements() {
     <div class="card supp-hero">
       ${ring(76, 8, waterPct, 'var(--phase2)')}
       <div style="flex:1;min-width:0;">
-        <div class="supp-hero-title">Water today</div>
+        <div class="supp-hero-title">Water ${isViewingToday() ? 'today' : viewDateLabel()}</div>
         <div class="supp-hero-sub">${day.waterMl}ml of 2200ml target.</div>
         <div class="quick-adds">
           <button class="quick-add-btn lg" data-action="add-water" data-ml="250">+250ml</button>
@@ -1353,18 +1399,18 @@ function attachInputHandlers() {
 // ---------------- actions ----------------
 
 function toggleMobility(id) {
-  const day = getDay(state, TODAY_ISO);
-  setDay(state, TODAY_ISO, { mobility: { ...day.mobility, [id]: !day.mobility[id] } });
+  const day = getDay(state, ui.viewDate);
+  setDay(state, ui.viewDate, { mobility: { ...day.mobility, [id]: !day.mobility[id] } });
   persist(); render();
 }
 function toggleMouthTape() {
-  const day = getDay(state, TODAY_ISO);
-  setDay(state, TODAY_ISO, { mouthTape: !day.mouthTape });
+  const day = getDay(state, ui.viewDate);
+  setDay(state, ui.viewDate, { mouthTape: !day.mouthTape });
   persist(); render();
 }
 function toggleSupp(id) {
-  const day = getDay(state, TODAY_ISO);
-  setDay(state, TODAY_ISO, { supplements: { ...day.supplements, [id]: !day.supplements[id] } });
+  const day = getDay(state, ui.viewDate);
+  setDay(state, ui.viewDate, { supplements: { ...day.supplements, [id]: !day.supplements[id] } });
   persist(); render();
 }
 
@@ -1433,8 +1479,8 @@ function deleteSupplement(id) {
   toast('Deleted');
 }
 function toggleChecklist(id) {
-  const day = getDay(state, TODAY_ISO);
-  setDay(state, TODAY_ISO, { checklist: { ...day.checklist, [id]: !day.checklist[id] } });
+  const day = getDay(state, ui.viewDate);
+  setDay(state, ui.viewDate, { checklist: { ...day.checklist, [id]: !day.checklist[id] } });
   persist(); render();
 }
 function togglePrerace(id) {
@@ -1475,12 +1521,12 @@ function deleteEquipmentItem(id) {
   toast('Deleted');
 }
 function addProtein(g) {
-  const day = getDay(state, TODAY_ISO);
-  setDay(state, TODAY_ISO, { proteinGrams: Math.max(0, day.proteinGrams + g) });
+  const day = getDay(state, ui.viewDate);
+  setDay(state, ui.viewDate, { proteinGrams: Math.max(0, day.proteinGrams + g) });
   persist(); render();
 }
 function resetProtein() {
-  setDay(state, TODAY_ISO, { proteinGrams: 0 });
+  setDay(state, ui.viewDate, { proteinGrams: 0 });
   persist(); render();
 }
 function addProteinManual() {
@@ -1511,12 +1557,12 @@ function proteinLookupAdd(grams) {
   toast(`Added ${grams}g protein`);
 }
 function addWater(ml) {
-  const day = getDay(state, TODAY_ISO);
-  setDay(state, TODAY_ISO, { waterMl: Math.max(0, day.waterMl + ml) });
+  const day = getDay(state, ui.viewDate);
+  setDay(state, ui.viewDate, { waterMl: Math.max(0, day.waterMl + ml) });
   persist(); render();
 }
 function resetWater() {
-  setDay(state, TODAY_ISO, { waterMl: 0 });
+  setDay(state, ui.viewDate, { waterMl: 0 });
   persist(); render();
 }
 function addWaterManual() {
@@ -1689,7 +1735,12 @@ function updateCountdownDisplays() {
 function checkMidnightRollover() {
   const nowIso = today();
   if (nowIso === TODAY_ISO) return;
+  // If the user was viewing today (not deliberately backfilling an earlier
+  // day), carry the view forward too -- otherwise midnight would silently
+  // strand them on what's now "yesterday".
+  const wasViewingToday = isViewingToday();
   TODAY_ISO = nowIso;
+  if (wasViewingToday) ui.viewDate = nowIso;
   // Cycle day is derived fresh by currentCycleDay() on every render, so
   // there's nothing to recompute here -- just re-render to pick it up.
   render();
@@ -1782,6 +1833,9 @@ document.addEventListener('click', (e) => {
     case 'delete-supplement': deleteSupplement(id); break;
     case 'toggle-checklist': toggleChecklist(id); break;
     case 'add-checklist': doAddChecklist(); break;
+    case 'day-prev': navDay(-1); break;
+    case 'day-next': navDay(1); break;
+    case 'day-today': jumpToToday(); break;
     case 'toggle-prerace': togglePrerace(id); break;
     case 'add-water': addWater(parseInt(target.dataset.ml, 10)); break;
     case 'reset-water': resetWater(); break;
