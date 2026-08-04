@@ -16,5 +16,10 @@
   "usda": {
     "_setup": "Go to https://fdc.nal.usda.gov/api-key-signup.html, sign up (instant, free, no card), paste the API key below.",
     "api_key": ""
+  },
+
+  "anthropic": {
+    "_setup": "Go to https://console.anthropic.com/settings/keys, create an API key, paste it below.",
+    "api_key": ""
   }
 }

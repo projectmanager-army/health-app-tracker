@@ -28,6 +28,10 @@ const ui = {
   proteinLookupResult: null,  // {description, proteinPer100g} | {error} | null
   proteinLookupLoading: false,
   proteinLookupGrams: 100,
+  coachOpen: false,
+  coachInput: '',
+  coachLoading: false,
+  coachError: null,  // 'no_config' | 'unauthorized' | 'network' | null
 };
 
 const WEEKS = buildWeeks();
@@ -151,6 +155,51 @@ function weeklyKm() {
   return state.runLog
     .filter((r) => r.source === 'strava' && isoSet.has(r.date))
     .reduce((a, r) => a + r.km, 0);
+}
+
+// Snapshot of live training state sent to the AI coach on every message —
+// built fresh each send so the model always reasons from current data.
+function buildCoachContext() {
+  const wk = currentWeek();
+  const { dayIdx } = currentWeekInfo();
+  const todayEntry = wk.days[dayIdx];
+  const restOfWeek = wk.days.slice(dayIdx).filter((d) => d !== todayEntry);
+
+  const cutoffIso = isoDate(addDays(new Date(), -14));
+  const recentStravaRuns = state.runLog
+    .filter((r) => r.source === 'strava' && r.date >= cutoffIso)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .map((r) => ({ date: r.date, km: Math.round(r.km * 10) / 10, name: r.name || null }));
+
+  const oura = ui.integrations.oura && ui.ouraSummary && !ui.ouraSummary.error
+    ? {
+        readiness: ui.ouraSummary.readiness?.score ?? null,
+        sleep: ui.ouraSummary.sleep?.score ?? null,
+        activity: ui.ouraSummary.activity?.score ?? null,
+      }
+    : null;
+
+  const cycleDayNum = currentCycleDay();
+  const day = getDay(state, TODAY_ISO);
+  const mobilityDone = state.customMobility.filter((m) => day.mobility[m.id]).length;
+
+  return {
+    daysToRace: computeDaysToRace(),
+    week: wk.week,
+    phase: wk.phaseName,
+    isDownWeek: wk.isDown,
+    todaysWorkout: todayEntry ? { day: todayEntry.label, type: todayEntry.type, detail: todayEntry.detail } : null,
+    restOfWeek: restOfWeek.map((d) => ({ day: d.label, type: d.type, detail: d.detail })),
+    weeklyKmSoFar: Math.round(weeklyKm() * 10) / 10,
+    recentStravaRuns,
+    oura,
+    cycle: state.cycleStartDate ? { day: cycleDayNum, phase: cyclePhaseForDay(cycleDayNum).name } : null,
+    adherence: {
+      mobilityDone,
+      mobilityTotal: state.customMobility.length,
+      mouthTapeStreak: mouthTapeStreak(state),
+    },
+  };
 }
 
 // ---------------- header ----------------
@@ -1017,6 +1066,87 @@ function renderRace() {
   </div>`;
 }
 
+// ---------------- coach ----------------
+
+function renderCoachWidget() {
+  const messages = state.coachMessages || [];
+  const errorMessages = {
+    no_config: "Coach isn't set up yet — add an Anthropic API key in Render env vars (or server/config.json locally).",
+    unauthorized: 'That Anthropic API key looks invalid — double check it in Render env vars.',
+    network: "Couldn't reach the coach — try again in a moment.",
+  };
+  const errorHint = ui.coachError ? (errorMessages[ui.coachError] || "Couldn't reach the coach — try again.") : null;
+
+  return `
+  <button class="coach-fab" data-action="toggle-coach" aria-label="${ui.coachOpen ? 'Close coach chat' : 'Open coach chat'}">
+    <i class="ti ${ui.coachOpen ? 'ti-x' : 'ti-message-chatbot'}"></i>
+  </button>
+  ${ui.coachOpen ? `
+  <div class="coach-panel">
+    <div class="coach-panel-head">
+      <div class="coach-panel-title"><i class="ti ti-message-chatbot"></i> Coach</div>
+      <div class="coach-panel-actions">
+        ${messages.length ? `<button class="coach-clear-btn" data-action="clear-coach">Clear</button>` : ''}
+        <button class="coach-close-btn" data-action="close-coach"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+    <div class="coach-messages" id="coach-messages">
+      ${messages.length === 0
+        ? `<div class="coach-empty-hint">Ask about today's workout, whether to adjust based on how you're feeling, or how this week's mileage looks against your plan.</div>`
+        : messages.map((m) => `<div class="coach-msg ${m.role}">${esc(m.content).replace(/\n/g, '<br>')}</div>`).join('')}
+      ${ui.coachLoading ? `<div class="coach-msg assistant coach-typing"><span></span><span></span><span></span></div>` : ''}
+      ${errorHint ? `<div class="coach-error-hint">${esc(errorHint)}</div>` : ''}
+    </div>
+    <div class="coach-input-row">
+      <input type="text" id="coach-input" class="coach-input" placeholder="Ask your coach…" value="${esc(ui.coachInput)}" ${ui.coachLoading ? 'disabled' : ''}>
+      <button class="coach-send-btn" data-action="send-coach" ${ui.coachLoading ? 'disabled' : ''}><i class="ti ti-send"></i></button>
+    </div>
+  </div>` : ''}`;
+}
+
+function scrollCoachToBottom() {
+  const el = document.getElementById('coach-messages');
+  if (el) el.scrollTop = el.scrollHeight;
+}
+
+async function sendCoachMessage() {
+  const text = ui.coachInput.trim();
+  if (!text || ui.coachLoading) return;
+  state.coachMessages = [...state.coachMessages, { role: 'user', content: text, ts: Date.now() }];
+  ui.coachInput = '';
+  ui.coachError = null;
+  ui.coachLoading = true;
+  persist(); render();
+  scrollCoachToBottom();
+
+  try {
+    const history = state.coachMessages.slice(-12).map((m) => ({ role: m.role, content: m.content }));
+    const res = await fetch('/api/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: history, context: buildCoachContext() }),
+    }).then((r) => r.json());
+
+    if (res.error) {
+      ui.coachError = res.error;
+    } else if (res.reply) {
+      state.coachMessages = [...state.coachMessages, { role: 'assistant', content: res.reply, ts: Date.now() }];
+      persist();
+    }
+  } catch {
+    ui.coachError = 'network';
+  }
+  ui.coachLoading = false;
+  render();
+  scrollCoachToBottom();
+}
+
+function clearCoachChat() {
+  state.coachMessages = [];
+  ui.coachError = null;
+  persist(); render();
+}
+
 // ---------------- modals ----------------
 
 function renderModals() {
@@ -1170,10 +1300,12 @@ function render() {
       </div>
     </div>
     ${renderModals()}
+    ${renderCoachWidget()}
     ${ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : ''}
   `;
 
   attachInputHandlers();
+  if (ui.coachOpen) scrollCoachToBottom();
 }
 
 function attachInputHandlers() {
@@ -1194,6 +1326,11 @@ function attachInputHandlers() {
   if (proteinLookupInput) {
     proteinLookupInput.addEventListener('input', (e) => { ui.proteinLookupQuery = e.target.value; });
     proteinLookupInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') proteinLookupSearch(); });
+  }
+  const coachInput = document.getElementById('coach-input');
+  if (coachInput) {
+    coachInput.addEventListener('input', (e) => { ui.coachInput = e.target.value; });
+    coachInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !ui.coachLoading) sendCoachMessage(); });
   }
   // Patches just the live estimate + Add button in place (not a full render)
   // so the grams input keeps focus while you type.
@@ -1685,6 +1822,10 @@ document.addEventListener('click', (e) => {
     case 'refresh-oura-summary': fetchOuraSummary(true); break;
     case 'sync-strava': syncStrava(true); break;
     case 'disconnect-strava': disconnectStrava(); break;
+    case 'toggle-coach': ui.coachOpen = !ui.coachOpen; render(); break;
+    case 'close-coach': ui.coachOpen = false; render(); break;
+    case 'send-coach': sendCoachMessage(); break;
+    case 'clear-coach': clearCoachChat(); break;
     case 'stop': e.stopPropagation(); break;
     default: break;
   }

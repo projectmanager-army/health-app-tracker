@@ -63,6 +63,7 @@ def load_config():
     config.setdefault('oura', {})
     config.setdefault('strava', {})
     config.setdefault('usda', {})
+    config.setdefault('anthropic', {})
 
     env_oura_token = os.environ.get('OURA_PERSONAL_ACCESS_TOKEN')
     if env_oura_token:
@@ -81,10 +82,15 @@ def load_config():
     if env_usda_key:
         config['usda']['api_key'] = env_usda_key
 
+    env_anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+    if env_anthropic_key:
+        config['anthropic']['api_key'] = env_anthropic_key
+
     has_oura = bool(config['oura'].get('personal_access_token', '').strip())
     has_strava = bool(config['strava'].get('client_id'))
     has_usda = bool(config['usda'].get('api_key', '').strip())
-    if not has_oura and not has_strava and not has_usda:
+    has_anthropic = bool(config['anthropic'].get('api_key', '').strip())
+    if not has_oura and not has_strava and not has_usda and not has_anthropic:
         return None
     return config
 
@@ -107,6 +113,15 @@ def http_request(url, data=None, headers=None, method=None):
         headers.setdefault('Content-Type', 'application/x-www-form-urlencoded')
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode())
+
+
+def http_request_json(url, payload, headers=None, timeout=30):
+    headers = dict(headers or {})
+    headers.setdefault('Content-Type', 'application/json')
+    body = json.dumps(payload).encode()
+    req = urllib.request.Request(url, data=body, headers=headers, method='POST')
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
 
 
@@ -295,6 +310,119 @@ def usda_lookup_protein(config, query):
     return {'connected': True, 'found': False}
 
 
+# ---------------- coach (Anthropic Claude) ----------------
+
+ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
+ANTHROPIC_MODEL = 'claude-sonnet-5'
+ANTHROPIC_VERSION = '2023-06-01'
+
+COACH_SYSTEM_TEMPLATE = """You are an experienced, encouraging running coach embedded in the athlete's personal Honolulu Marathon training tracker web app. Ground every answer in the live training data below — never invent numbers that aren't there.
+
+Race: Honolulu Marathon, December 13, 2026.
+
+Non-negotiables baked into this plan (don't casually suggest dropping these): nasal breathing on easy runs, daily achilles/toe-spacer mobility work, midfoot strike focus, heat-adaptation long runs scheduled 10am–2pm before Peak phase, walk breaks allowed on long runs.
+
+You cannot edit the plan yourself — the app only lets the athlete change it. If you think a specific day's workout should change (low readiness, high recent mileage, missed sessions, soreness they mention, etc.), say so plainly, explain your reasoning from the data, and tell them to update it themselves if they agree. Be specific and concise, not generic training-book filler. Ask a clarifying question if the data below doesn't cover what you'd need to answer well.
+
+Current status:
+{context_text}"""
+
+
+def format_coach_context(context):
+    if not isinstance(context, dict):
+        context = {}
+    lines = []
+    lines.append(f"Days to race: {context.get('daysToRace', 'unknown')}")
+    down = ' (a scheduled down week)' if context.get('isDownWeek') else ''
+    lines.append(f"Current week: {context.get('week', '?')} of 27 — {context.get('phase', 'unknown')} phase{down}")
+
+    today = context.get('todaysWorkout')
+    if today:
+        lines.append(f"Today's planned workout ({today.get('day', '')}): {today.get('type', '')} — {today.get('detail', '')}")
+
+    rest = context.get('restOfWeek') or []
+    if rest:
+        lines.append("Rest of this week's plan:")
+        for d in rest:
+            lines.append(f"  - {d.get('day', '')}: {d.get('type', '')} — {d.get('detail', '')}")
+
+    lines.append(f"km logged this week (Strava-synced runs only): {context.get('weeklyKmSoFar', 0)}")
+
+    runs = context.get('recentStravaRuns') or []
+    if runs:
+        lines.append("Recent Strava runs (last 14 days):")
+        for r in runs:
+            name = f' "{r["name"]}"' if r.get('name') else ''
+            lines.append(f"  - {r.get('date', '')}: {r.get('km', '?')}km{name}")
+    else:
+        lines.append("No Strava runs synced in the last 14 days.")
+
+    oura = context.get('oura')
+    if oura:
+        lines.append(
+            f"Oura today — readiness {oura.get('readiness', '?')}, "
+            f"sleep {oura.get('sleep', '?')}, activity {oura.get('activity', '?')}"
+        )
+    else:
+        lines.append("Oura not connected, or no data yet today.")
+
+    cycle = context.get('cycle')
+    if cycle:
+        lines.append(f"Cycle: day {cycle.get('day', '?')} of 28 ({cycle.get('phase', '?')} phase)")
+
+    adherence = context.get('adherence') or {}
+    if adherence:
+        lines.append(
+            f"Today's mobility work: {adherence.get('mobilityDone', '?')}/{adherence.get('mobilityTotal', '?')} done. "
+            f"Mouth tape streak: {adherence.get('mouthTapeStreak', '?')} days."
+        )
+
+    return '\n'.join(lines)
+
+
+def coach_reply(config, messages, context):
+    api_key = (config.get('anthropic') or {}).get('api_key', '').strip()
+    if not api_key:
+        return {'error': 'no_config'}
+
+    system = COACH_SYSTEM_TEMPLATE.format(context_text=format_coach_context(context))
+    # Trim to the last 12 turns and clamp message length — this is a personal
+    # single-user app, but the coach endpoint still shouldn't accept an
+    # unbounded body and rack up an unbounded Anthropic bill from one bad request.
+    trimmed = messages[-12:]
+    safe_messages = []
+    for m in trimmed:
+        role = m.get('role')
+        content = str(m.get('content', ''))[:4000]
+        if role in ('user', 'assistant') and content.strip():
+            safe_messages.append({'role': role, 'content': content})
+    if not safe_messages:
+        return {'error': 'no_messages'}
+
+    payload = {
+        'model': ANTHROPIC_MODEL,
+        'max_tokens': 1024,
+        'system': system,
+        'messages': safe_messages,
+    }
+    try:
+        data = http_request_json(ANTHROPIC_API, payload, headers={
+            'x-api-key': api_key,
+            'anthropic-version': ANTHROPIC_VERSION,
+        })
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return {'error': 'unauthorized'}
+        return {'error': f'http_{e.code}'}
+    except Exception:
+        return {'error': 'network'}
+
+    text = ''.join(
+        block.get('text', '') for block in data.get('content', []) if block.get('type') == 'text'
+    )
+    return {'reply': text}
+
+
 # ---------------- request handler ----------------
 
 class Handler(BaseHTTPRequestHandler):
@@ -324,6 +452,25 @@ class Handler(BaseHTTPRequestHandler):
             return self.handle_api(path, query)
         return self.serve_static(path)
 
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        if path == '/api/coach':
+            length = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(length) if length else b'{}'
+            try:
+                body = json.loads(raw.decode())
+            except json.JSONDecodeError:
+                return self.send_json({'error': 'bad_request'}, status=400)
+            config = load_config()
+            if not config or not (config.get('anthropic') or {}).get('api_key', '').strip():
+                return self.send_json({'error': 'no_config'})
+            messages = body.get('messages')
+            if not isinstance(messages, list) or not messages:
+                return self.send_json({'error': 'no_messages'}, status=400)
+            return self.send_json(coach_reply(config, messages, body.get('context')))
+        return self.send_json({'error': 'not_found'}, status=404)
+
     def handle_api(self, path, query):
         config = load_config()
 
@@ -332,12 +479,17 @@ class Handler(BaseHTTPRequestHandler):
             oura_on = bool(config and (config.get('oura') or {}).get('personal_access_token', '').strip())
             strava_on = bool(tokens.get('strava'))
             usda_on = bool(config and (config.get('usda') or {}).get('api_key', '').strip())
+            anthropic_on = bool(config and (config.get('anthropic') or {}).get('api_key', '').strip())
             configured = {
                 'oura': bool(config and (config.get('oura') or {}).get('personal_access_token', '').strip()),
                 'strava': bool(config and (config.get('strava') or {}).get('client_id')),
                 'usda': usda_on,
+                'anthropic': anthropic_on,
             }
-            return self.send_json({'oura': oura_on, 'strava': strava_on, 'usda': usda_on, 'configured': configured})
+            return self.send_json({
+                'oura': oura_on, 'strava': strava_on, 'usda': usda_on, 'anthropic': anthropic_on,
+                'configured': configured,
+            })
 
         if path == '/api/oura/readiness':
             if not config:

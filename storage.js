@@ -30,6 +30,7 @@ function defaultState() {
     customMobility: MOBILITY_DEFAULTS.map((m) => ({ ...m })),
     customSupplements: SUPPLEMENT_DEFAULTS.map((s) => ({ ...s })),
     daily: {}, // date -> { mobility:{id:bool}, mouthTape:bool, supplements:{id:bool}, checklist:{id:bool}, proteinGrams, waterMl, nasalToday, achillesToday }
+    coachMessages: [], // {role: 'user'|'assistant', content, ts} -- AI coach chat history
     darkMode: true,
     racePhoto: null,
   };
