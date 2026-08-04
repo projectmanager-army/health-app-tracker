@@ -14,5 +14,9 @@ services:
         sync: false
       - key: STRAVA_REDIRECT_URI
         sync: false
+      - key: STRAVA_REFRESH_TOKEN
+        sync: false
       - key: USDA_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
         sync: false

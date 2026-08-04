@@ -78,6 +78,11 @@ def load_config():
         if val:
             config['strava'][key] = val
 
+    # Bootstrap fallback for strava_ensure_token() -- see the comment there for why.
+    env_strava_refresh = os.environ.get('STRAVA_REFRESH_TOKEN')
+    if env_strava_refresh:
+        config['strava']['seed_refresh_token'] = env_strava_refresh
+
     env_usda_key = os.environ.get('USDA_API_KEY')
     if env_usda_key:
         config['usda']['api_key'] = env_usda_key
@@ -214,27 +219,51 @@ def strava_exchange_code(config, code):
         'athlete_id': (data.get('athlete') or {}).get('id'),
     }
     save_tokens(tokens)
+    # tokens.json lives on local disk, which most hosts (e.g. Render's free
+    # plan) wipe on every redeploy -- print the refresh token so it can be
+    # copied into a STRAVA_REFRESH_TOKEN env var once, letting
+    # strava_ensure_token() self-heal after a redeploy instead of silently
+    # showing "disconnected" until someone notices and reconnects by hand.
+    print(f"[strava] connected. To survive redeploys, set env var STRAVA_REFRESH_TOKEN={data['refresh_token']}")
 
 
 def strava_ensure_token(config):
     tokens = load_tokens()
     strava = tokens.get('strava')
+    seed_refresh = None
     if not strava:
-        return None
+        seed_refresh = (config.get('strava') or {}).get('seed_refresh_token', '').strip()
+        if not seed_refresh:
+            return None
+        # tokens.json was wiped (e.g. a redeploy) but a refresh token was
+        # seeded via env var -- bootstrap a fresh token pair from it instead
+        # of requiring the user to reconnect through the OAuth flow again.
+        strava = {'access_token': None, 'refresh_token': seed_refresh, 'expires_at': 0}
     if strava['expires_at'] > time.time() + 60:
         return strava['access_token']
     s = config['strava']
-    data = http_request(STRAVA_TOKEN, data={
-        'client_id': s['client_id'],
-        'client_secret': s['client_secret'],
-        'refresh_token': strava['refresh_token'],
-        'grant_type': 'refresh_token',
-    })
+    try:
+        data = http_request(STRAVA_TOKEN, data={
+            'client_id': s['client_id'],
+            'client_secret': s['client_secret'],
+            'refresh_token': strava['refresh_token'],
+            'grant_type': 'refresh_token',
+        })
+    except Exception:
+        # Expired/revoked refresh token, or a stale STRAVA_REFRESH_TOKEN seed
+        # -- surface as "not connected" (every caller already handles that)
+        # instead of letting an uncaught HTTPError crash the request.
+        return None
     strava['access_token'] = data['access_token']
     strava['refresh_token'] = data.get('refresh_token', strava['refresh_token'])
     strava['expires_at'] = data['expires_at']
     tokens['strava'] = strava
     save_tokens(tokens)
+    # Strava refresh tokens rarely rotate, but if this one just did, the env
+    # var seed is now stale -- flag it so it gets updated before the next
+    # redeploy wipes tokens.json and falls back to the old one.
+    if seed_refresh and strava['refresh_token'] != seed_refresh:
+        print(f"[strava] refresh token rotated -- update env var STRAVA_REFRESH_TOKEN={strava['refresh_token']}")
     return strava['access_token']
 
 

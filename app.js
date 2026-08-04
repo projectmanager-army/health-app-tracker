@@ -1011,7 +1011,7 @@ function renderShoes() {
         <div class="card shoe-card">
           <div class="shoe-blob" style="background:${blobColor};"></div>
           <div class="shoe-photo" data-action="shoe-photo" data-id="${sh.id}">
-            ${sh.photo ? `<img src="${sh.photo}" alt="${esc(sh.name)}">` : `<span>Drop / click to add a shoe photo</span>`}
+            ${sh.photo ? `<img src="${esc(sh.photo)}" alt="${esc(sh.name)}">` : `<span>Drop / click to add a shoe photo</span>`}
           </div>
           <input type="file" accept="image/*" id="shoe-file-${sh.id}" style="display:none;" data-action="shoe-photo-input" data-id="${sh.id}">
           <div class="shoe-body">
@@ -1066,7 +1066,6 @@ function renderShoes() {
 
 function renderRace() {
   const daysToRace = computeDaysToRace();
-  const day = getDay(state, TODAY_ISO);
 
   const prerace = Object.keys(PRERACE_LABELS).map((id) => ({
     id, label: PRERACE_LABELS[id], done: !!state.prerace[id],
@@ -1074,7 +1073,7 @@ function renderRace() {
 
   return `
   <div>
-    <div class="race-hero" data-action="race-photo" ${state.racePhoto ? `style="background-image:url(${state.racePhoto});background-size:cover;background-position:center;"` : ''}>
+    <div class="race-hero" data-action="race-photo" ${state.racePhoto ? `style="background-image:url(${esc(state.racePhoto)});background-size:cover;background-position:center;"` : ''}>
       <input type="file" accept="image/*" id="race-photo-file" style="display:none;" data-action="race-photo-input">
       <div class="race-hero-overlay"></div>
       <div class="race-hero-content">
@@ -1728,10 +1727,11 @@ function updateCountdownDisplays() {
 
 // Detects a real calendar-day change (e.g. the tab was left open past midnight)
 // and rolls today's tracking state over to a fresh day. Because mobility/
-// supplements/checklist/water/protein are all keyed by TODAY_ISO in
-// state.daily, simply advancing TODAY_ISO to the new date and re-rendering is
-// enough -- getDay() returns a blank day for a date with no stored entry yet,
-// so everything appears unchecked/zeroed with no separate "reset" step needed.
+// supplements/checklist/water/protein are all keyed by ui.viewDate (which
+// tracks TODAY_ISO unless you've deliberately navigated to backfill an
+// earlier day) in state.daily, getDay() returns a blank day for a date with
+// no stored entry yet, so everything appears unchecked/zeroed with no
+// separate "reset" step needed.
 function checkMidnightRollover() {
   const nowIso = today();
   if (nowIso === TODAY_ISO) return;
@@ -1903,8 +1903,8 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (ui.selectedDay || ui.editingMobilityId || ui.editingSupplementId || ui.editingEquipmentId || ui.showColdHeat) {
-      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.editingEquipmentId = null; ui.showColdHeat = false;
+    if (ui.selectedDay || ui.editingMobilityId || ui.editingSupplementId || ui.editingEquipmentId || ui.showColdHeat || ui.coachOpen) {
+      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.editingEquipmentId = null; ui.showColdHeat = false; ui.coachOpen = false;
       render();
     }
   }
