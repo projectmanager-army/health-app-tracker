@@ -17,6 +17,7 @@ Run locally:  python3 server/server.py
 import json
 import mimetypes
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -348,10 +349,12 @@ ANTHROPIC_VERSION = '2023-06-01'
 COACH_SYSTEM_TEMPLATE = """You are an experienced, encouraging running coach embedded in the athlete's personal Honolulu Marathon training tracker web app. Ground every answer in the live training data below — never invent numbers that aren't there.
 
 Race: Honolulu Marathon, December 13, 2026.
-{health_profile_section}
+{health_profile_section}{memory_section}
 Non-negotiables baked into this plan (don't casually suggest dropping these): nasal breathing on easy runs, daily achilles/toe-spacer mobility work, midfoot strike focus, heat-adaptation long runs scheduled 10am–2pm before Peak phase, walk breaks allowed on long runs.
 
-You cannot edit the plan yourself — the app only lets the athlete change it. If you think a specific day's workout should change (low readiness, high recent mileage, missed sessions, soreness they mention, etc.), say so plainly, explain your reasoning from the data, and tell them to update it themselves if they agree. Be specific and concise, not generic training-book filler. Ask a clarifying question if the data below doesn't cover what you'd need to answer well.
+You cannot edit the plan yourself — the app only lets the athlete change it. If you think a specific day's workout should change (low readiness, high recent mileage, missed sessions, soreness they mention, etc.), say so plainly, explain your reasoning from the data, and tell them to update it themselves if they agree. Be specific and concise -- a few sentences to a short paragraph is usually enough, not an exhaustive breakdown -- and ask a clarifying question if the data below doesn't cover what you'd need to answer well.
+
+If the athlete tells you something durable worth remembering for future conversations -- an injury detail, a preference, a recurring pattern, a goal, anything not already covered below or in "things you've learned" -- put one line per new fact at the very START of your response, before anything else, formatted exactly as "MEMORY: <short fact>". Put these first (not at the end) so they're never lost if your reply runs long. Only do this for genuinely new information they just told you -- most replies won't need one. These lines are stripped out before the athlete sees your reply, so never refer to them in the visible answer.
 
 Current status:
 {context_text}"""
@@ -371,6 +374,30 @@ def format_health_profile_section(context):
         "safety-relevant (e.g. seizure or syncope history around heat/intensity, "
         "injury history around specific movements):\n" + profile + "\n"
     )
+
+
+def format_memory_section(context):
+    memories = (context or {}).get('coachMemory')
+    if not isinstance(memories, list) or not memories:
+        return ''
+    lines = ["\nThings you've learned about this athlete from past conversations:"]
+    for m in memories[-60:]:
+        if isinstance(m, str) and m.strip():
+            lines.append(f"  - {m.strip()[:300]}")
+    return '\n'.join(lines) + '\n'
+
+
+MEMORY_LINE_RE = re.compile(r'^MEMORY:\s*(.+)$', re.MULTILINE)
+
+
+def extract_memories(text):
+    """Pulls trailing "MEMORY: ..." lines out of a reply -- these are the
+    model's own signal for what's worth remembering next time, not meant to
+    be shown to the athlete."""
+    memories = [m.strip() for m in MEMORY_LINE_RE.findall(text) if m.strip()]
+    cleaned = MEMORY_LINE_RE.sub('', text)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+    return cleaned, memories
 
 
 def format_coach_context(context):
@@ -422,6 +449,17 @@ def format_coach_context(context):
             f"Mouth tape streak: {adherence.get('mouthTapeStreak', '?')} days."
         )
 
+    trend = context.get('last7Days')
+    if trend:
+        lines.append(
+            f"Last 7 days ({trend.get('daysWithData', '?')} days with data): "
+            f"mobility adherence {trend.get('mobilityAdherencePct', '?')}%, "
+            f"supplement adherence {trend.get('supplementAdherencePct', '?')}%, "
+            f"avg water {trend.get('avgWaterMl', '?')}ml/day, "
+            f"avg protein {trend.get('avgProteinG', '?')}g/day, "
+            f"mouth tape {trend.get('mouthTapeDaysHit', '?')}/7 nights."
+        )
+
     return '\n'.join(lines)
 
 
@@ -432,6 +470,7 @@ def coach_reply(config, messages, context):
 
     system = COACH_SYSTEM_TEMPLATE.format(
         health_profile_section=format_health_profile_section(context),
+        memory_section=format_memory_section(context),
         context_text=format_coach_context(context),
     )
     # Trim to the last 12 turns and clamp message length — this is a personal
@@ -449,7 +488,7 @@ def coach_reply(config, messages, context):
 
     payload = {
         'model': ANTHROPIC_MODEL,
-        'max_tokens': 1024,
+        'max_tokens': 1536,
         'system': system,
         'messages': safe_messages,
     }
@@ -468,7 +507,11 @@ def coach_reply(config, messages, context):
     text = ''.join(
         block.get('text', '') for block in data.get('content', []) if block.get('type') == 'text'
     )
-    return {'reply': text}
+    cleaned_text, new_memories = extract_memories(text)
+    result = {'reply': cleaned_text}
+    if new_memories:
+        result['memories'] = new_memories
+    return result
 
 
 # ---------------- request handler ----------------

@@ -32,6 +32,7 @@ function defaultState() {
     daily: {}, // date -> { mobility:{id:bool}, mouthTape:bool, supplements:{id:bool}, checklist:{id:bool}, proteinGrams, waterMl, nasalToday, achillesToday }
     coachMessages: [], // {role: 'user'|'assistant', content, ts} -- AI coach chat history
     healthProfile: '', // free-text medical/lifestyle background, sent to the coach on every message so it doesn't need re-explaining
+    coachMemory: [], // {id, text, ts} -- durable facts the coach has picked up from conversation, carried forward beyond the chat window
     darkMode: true,
     racePhoto: null,
   };

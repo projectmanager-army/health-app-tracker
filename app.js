@@ -191,6 +191,36 @@ function weeklyKm() {
     .reduce((a, r) => a + r.km, 0);
 }
 
+// Rolling 7-day adherence trend, computed fresh from state.daily -- this is
+// what makes the coach's advice reflect real logged behavior over time
+// rather than just a single day's snapshot.
+function buildCoachTrends() {
+  const days = 7;
+  const mobilityCount = Math.max(1, state.customMobility.length);
+  const suppCount = Math.max(1, state.customSupplements.length);
+  let mobilitySum = 0, suppSum = 0, waterSum = 0, proteinSum = 0, mouthTapeDays = 0, loggedDays = 0;
+  for (let i = 0; i < days; i++) {
+    const iso = isoDate(addDays(new Date(TODAY_ISO + 'T00:00:00'), -i));
+    const rec = state.daily[iso];
+    if (!rec) continue;
+    loggedDays++;
+    mobilitySum += Object.values(rec.mobility || {}).filter(Boolean).length / mobilityCount;
+    suppSum += Object.values(rec.supplements || {}).filter(Boolean).length / suppCount;
+    waterSum += rec.waterMl || 0;
+    proteinSum += rec.proteinGrams || 0;
+    if (rec.mouthTape) mouthTapeDays++;
+  }
+  if (!loggedDays) return null;
+  return {
+    daysWithData: loggedDays,
+    mobilityAdherencePct: Math.round((mobilitySum / loggedDays) * 100),
+    supplementAdherencePct: Math.round((suppSum / loggedDays) * 100),
+    avgWaterMl: Math.round(waterSum / loggedDays),
+    avgProteinG: Math.round(proteinSum / loggedDays),
+    mouthTapeDaysHit: mouthTapeDays,
+  };
+}
+
 // Snapshot of live training state sent to the AI coach on every message —
 // built fresh each send so the model always reasons from current data.
 function buildCoachContext() {
@@ -233,7 +263,9 @@ function buildCoachContext() {
       mobilityTotal: state.customMobility.length,
       mouthTapeStreak: mouthTapeStreak(state),
     },
+    last7Days: buildCoachTrends(),
     healthProfile: state.healthProfile ? state.healthProfile.trim() : null,
+    coachMemory: (state.coachMemory || []).map((m) => m.text),
   };
 }
 
@@ -1179,6 +1211,7 @@ async function sendCoachMessage() {
       ui.coachError = res.error;
     } else if (res.reply) {
       state.coachMessages = [...state.coachMessages, { role: 'assistant', content: res.reply, ts: Date.now() }];
+      if (Array.isArray(res.memories) && res.memories.length) addCoachMemories(res.memories);
       persist();
     }
   } catch {
@@ -1187,6 +1220,21 @@ async function sendCoachMessage() {
   ui.coachLoading = false;
   render();
   scrollCoachToBottom();
+}
+
+// Facts the coach flags as worth remembering get folded in here, deduped
+// against what's already stored, so the same observation doesn't pile up
+// every time it comes up in conversation. Capped so the memory list (which
+// gets sent in full on every future message) can't grow unbounded.
+const COACH_MEMORY_CAP = 60;
+function addCoachMemories(facts) {
+  const existing = new Set(state.coachMemory.map((m) => m.text.trim().toLowerCase()));
+  const additions = facts
+    .map((f) => (typeof f === 'string' ? f.trim() : ''))
+    .filter((f) => f && !existing.has(f.toLowerCase()))
+    .map((text) => ({ id: 'mem-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), text, ts: Date.now() }));
+  if (!additions.length) return;
+  state.coachMemory = [...state.coachMemory, ...additions].slice(-COACH_MEMORY_CAP);
 }
 
 function clearCoachChat() {
@@ -1209,6 +1257,11 @@ function saveHealthProfileEdit() {
   ui.editingHealthProfile = false;
   persist(); render();
   toast('Health profile saved');
+}
+
+function deleteCoachMemory(id) {
+  state.coachMemory = state.coachMemory.filter((m) => m.id !== id);
+  persist(); render();
 }
 
 // ---------------- modals ----------------
@@ -1333,6 +1386,16 @@ function renderModals() {
           <span></span>
           <button class="quick-add-btn lg" data-action="save-health-profile-edit">Save</button>
         </div>
+
+        <div class="section-label" style="margin-top:22px;">What the coach has learned</div>
+        <div class="page-sub" style="margin-bottom:10px;">Facts it's picked up from chatting with you — remove anything outdated or wrong.</div>
+        ${state.coachMemory.length === 0
+          ? `<div class="coach-empty-hint">Nothing yet — this fills in automatically as you talk with the coach.</div>`
+          : state.coachMemory.map((m) => `
+            <div class="memory-row">
+              <div class="memory-row-text">${esc(m.text)}</div>
+              <button class="memory-delete-btn" data-action="delete-coach-memory" data-id="${m.id}"><i class="ti ti-x"></i></button>
+            </div>`).join('')}
       </div>
     </div>`;
   }
@@ -1923,6 +1986,7 @@ document.addEventListener('click', (e) => {
     case 'edit-health-profile': openHealthProfileEdit(); break;
     case 'close-health-profile-edit': closeHealthProfileEdit(); break;
     case 'save-health-profile-edit': saveHealthProfileEdit(); break;
+    case 'delete-coach-memory': deleteCoachMemory(id); break;
     case 'stop': e.stopPropagation(); break;
     default: break;
   }

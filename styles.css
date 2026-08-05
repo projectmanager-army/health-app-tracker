@@ -385,6 +385,11 @@ button{cursor:pointer;}
 select.form-input{appearance:none;-webkit-appearance:none;}
 .form-textarea{resize:vertical;min-height:60px;line-height:1.5;}
 .form-textarea.tall{min-height:280px;}
+.memory-row{display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:12px;
+  padding:10px 12px;margin-bottom:8px;}
+.memory-row-text{flex:1;font-size:12.5px;line-height:1.5;}
+.memory-delete-btn{border:none;background:transparent;color:var(--sub);flex:none;width:22px;height:22px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;}
 .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;}
 .modal-delete-btn{border:none;background:transparent;color:var(--coral);font-size:12.5px;font-weight:600;padding:8px 4px;}
 
