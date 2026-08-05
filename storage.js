@@ -31,6 +31,7 @@ function defaultState() {
     customSupplements: SUPPLEMENT_DEFAULTS.map((s) => ({ ...s })),
     daily: {}, // date -> { mobility:{id:bool}, mouthTape:bool, supplements:{id:bool}, checklist:{id:bool}, proteinGrams, waterMl, nasalToday, achillesToday }
     coachMessages: [], // {role: 'user'|'assistant', content, ts} -- AI coach chat history
+    healthProfile: '', // free-text medical/lifestyle background, sent to the coach on every message so it doesn't need re-explaining
     darkMode: true,
     racePhoto: null,
   };

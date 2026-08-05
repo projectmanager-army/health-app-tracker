@@ -33,6 +33,7 @@ const ui = {
   coachLoading: false,
   coachError: null,  // 'no_config' | 'unauthorized' | 'network' | null
   viewDate: today(),  // which day's log (mobility/supplements/water/protein/checklist) is being viewed/edited
+  editingHealthProfile: false,
 };
 
 const WEEKS = buildWeeks();
@@ -232,6 +233,7 @@ function buildCoachContext() {
       mobilityTotal: state.customMobility.length,
       mouthTapeStreak: mouthTapeStreak(state),
     },
+    healthProfile: state.healthProfile ? state.healthProfile.trim() : null,
   };
 }
 
@@ -1131,13 +1133,14 @@ function renderCoachWidget() {
     <div class="coach-panel-head">
       <div class="coach-panel-title"><i class="ti ti-message-chatbot"></i> Coach</div>
       <div class="coach-panel-actions">
+        <button class="coach-profile-btn" data-action="edit-health-profile" title="Health profile — sent to the coach every message"><i class="ti ti-notes"></i></button>
         ${messages.length ? `<button class="coach-clear-btn" data-action="clear-coach">Clear</button>` : ''}
         <button class="coach-close-btn" data-action="close-coach"><i class="ti ti-x"></i></button>
       </div>
     </div>
     <div class="coach-messages" id="coach-messages">
       ${messages.length === 0
-        ? `<div class="coach-empty-hint">Ask about today's workout, whether to adjust based on how you're feeling, or how this week's mileage looks against your plan.</div>`
+        ? `<div class="coach-empty-hint">Ask about today's workout, whether to adjust based on how you're feeling, or how this week's mileage looks against your plan.${state.healthProfile ? '' : ' Tap the notes icon above to add your health profile once so I don’t need it re-explained every time.'}</div>`
         : messages.map((m) => `<div class="coach-msg ${m.role}">${esc(m.content).replace(/\n/g, '<br>')}</div>`).join('')}
       ${ui.coachLoading ? `<div class="coach-msg assistant coach-typing"><span></span><span></span><span></span></div>` : ''}
       ${errorHint ? `<div class="coach-error-hint">${esc(errorHint)}</div>` : ''}
@@ -1190,6 +1193,22 @@ function clearCoachChat() {
   state.coachMessages = [];
   ui.coachError = null;
   persist(); render();
+}
+
+function openHealthProfileEdit() {
+  ui.editingHealthProfile = true;
+  render();
+}
+function closeHealthProfileEdit() {
+  ui.editingHealthProfile = false;
+  render();
+}
+function saveHealthProfileEdit() {
+  const text = document.getElementById('health-profile-edit-text').value.trim();
+  state.healthProfile = text;
+  ui.editingHealthProfile = false;
+  persist(); render();
+  toast('Health profile saved');
 }
 
 // ---------------- modals ----------------
@@ -1292,6 +1311,27 @@ function renderModals() {
         <div class="modal-actions">
           ${!isNew ? `<button class="modal-delete-btn" data-action="delete-equipment" data-id="${item.id}">Delete</button>` : '<span></span>'}
           <button class="quick-add-btn lg" data-action="save-equipment-edit">Save</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  if (ui.editingHealthProfile) {
+    html += `
+    <div class="modal-overlay" data-action="close-health-profile-edit">
+      <div class="modal wide" data-action="stop">
+        <div class="modal-head">
+          <div>
+            <div class="modal-title">Health profile</div>
+            <div class="modal-eyebrow" style="margin-top:2px;">Sent to the coach as background on every message</div>
+          </div>
+          <button class="modal-close" data-action="close-health-profile-edit"><i class="ti ti-x"></i></button>
+        </div>
+        <label class="form-label">Medical history, conditions, lifestyle notes — whatever the coach should already know</label>
+        <textarea id="health-profile-edit-text" class="form-input form-textarea tall" placeholder="e.g. history of vasovagal syncope and seizures, partial achilles tear at 16, mouth breather, TMJ, diet is whole-foods with animal protein, no alcohol/tobacco...">${esc(state.healthProfile)}</textarea>
+        <div class="modal-actions">
+          <span></span>
+          <button class="quick-add-btn lg" data-action="save-health-profile-edit">Save</button>
         </div>
       </div>
     </div>`;
@@ -1880,6 +1920,9 @@ document.addEventListener('click', (e) => {
     case 'close-coach': ui.coachOpen = false; render(); break;
     case 'send-coach': sendCoachMessage(); break;
     case 'clear-coach': clearCoachChat(); break;
+    case 'edit-health-profile': openHealthProfileEdit(); break;
+    case 'close-health-profile-edit': closeHealthProfileEdit(); break;
+    case 'save-health-profile-edit': saveHealthProfileEdit(); break;
     case 'stop': e.stopPropagation(); break;
     default: break;
   }
@@ -1903,8 +1946,8 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (ui.selectedDay || ui.editingMobilityId || ui.editingSupplementId || ui.editingEquipmentId || ui.showColdHeat || ui.coachOpen) {
-      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.editingEquipmentId = null; ui.showColdHeat = false; ui.coachOpen = false;
+    if (ui.selectedDay || ui.editingMobilityId || ui.editingSupplementId || ui.editingEquipmentId || ui.editingHealthProfile || ui.showColdHeat || ui.coachOpen) {
+      ui.selectedDay = null; ui.editingMobilityId = null; ui.editingSupplementId = null; ui.editingEquipmentId = null; ui.editingHealthProfile = false; ui.showColdHeat = false; ui.coachOpen = false;
       render();
     }
   }

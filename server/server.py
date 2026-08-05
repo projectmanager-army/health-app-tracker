@@ -348,13 +348,29 @@ ANTHROPIC_VERSION = '2023-06-01'
 COACH_SYSTEM_TEMPLATE = """You are an experienced, encouraging running coach embedded in the athlete's personal Honolulu Marathon training tracker web app. Ground every answer in the live training data below — never invent numbers that aren't there.
 
 Race: Honolulu Marathon, December 13, 2026.
-
+{health_profile_section}
 Non-negotiables baked into this plan (don't casually suggest dropping these): nasal breathing on easy runs, daily achilles/toe-spacer mobility work, midfoot strike focus, heat-adaptation long runs scheduled 10am–2pm before Peak phase, walk breaks allowed on long runs.
 
 You cannot edit the plan yourself — the app only lets the athlete change it. If you think a specific day's workout should change (low readiness, high recent mileage, missed sessions, soreness they mention, etc.), say so plainly, explain your reasoning from the data, and tell them to update it themselves if they agree. Be specific and concise, not generic training-book filler. Ask a clarifying question if the data below doesn't cover what you'd need to answer well.
 
 Current status:
 {context_text}"""
+
+
+def format_health_profile_section(context):
+    profile = (context or {}).get('healthProfile')
+    if not isinstance(profile, str) or not profile.strip():
+        return ''
+    # Clamp length -- this is meant to be background, not the bulk of every
+    # request's tokens, and it's user-supplied free text going straight into
+    # the system prompt.
+    profile = profile.strip()[:6000]
+    return (
+        "\nAthlete health profile — medical history, conditions, and lifestyle "
+        "background. Keep this in mind for every answer, especially anything "
+        "safety-relevant (e.g. seizure or syncope history around heat/intensity, "
+        "injury history around specific movements):\n" + profile + "\n"
+    )
 
 
 def format_coach_context(context):
@@ -414,7 +430,10 @@ def coach_reply(config, messages, context):
     if not api_key:
         return {'error': 'no_config'}
 
-    system = COACH_SYSTEM_TEMPLATE.format(context_text=format_coach_context(context))
+    system = COACH_SYSTEM_TEMPLATE.format(
+        health_profile_section=format_health_profile_section(context),
+        context_text=format_coach_context(context),
+    )
     # Trim to the last 12 turns and clamp message length — this is a personal
     # single-user app, but the coach endpoint still shouldn't accept an
     # unbounded body and rack up an unbounded Anthropic bill from one bad request.

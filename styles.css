@@ -384,6 +384,7 @@ button{cursor:pointer;}
   padding:9px 11px;font-size:13.5px;color:var(--text);font-family:inherit;}
 select.form-input{appearance:none;-webkit-appearance:none;}
 .form-textarea{resize:vertical;min-height:60px;line-height:1.5;}
+.form-textarea.tall{min-height:280px;}
 .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;}
 .modal-delete-btn{border:none;background:transparent;color:var(--coral);font-size:12.5px;font-weight:600;padding:8px 4px;}
 
@@ -437,6 +438,8 @@ select.form-input{appearance:none;-webkit-appearance:none;}
 .coach-panel-actions{display:flex;align-items:center;gap:6px;}
 .coach-clear-btn{border:none;background:transparent;color:var(--sub);font-size:11.5px;font-weight:700;
   padding:4px 6px;cursor:pointer;}
+.coach-profile-btn{border:none;background:var(--surface2);color:var(--sub);border-radius:50%;width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;}
 .coach-close-btn{border:none;background:var(--surface2);color:var(--text);border-radius:50%;width:26px;height:26px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;}
 .coach-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
