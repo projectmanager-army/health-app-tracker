@@ -532,7 +532,7 @@ function renderHome() {
       <div class="cycle-dots">${dots}</div>
       <div class="cycle-foods">
         <div class="cycle-foods-label">Recommended foods</div>
-        <div class="cycle-foods-text">${cyclePhase.groups.map((g) => g.items).join(', ')}</div>
+        <div class="cycle-foods-text">${cyclePhase.groups.slice(0, 2).map((g) => g.items).join(', ')} — full list &amp; workout/social guidance on the Cycle tab</div>
       </div>
     </div>
 
@@ -1014,10 +1014,27 @@ function renderCycle() {
     <div class="card">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
         <span style="width:9px;height:9px;border-radius:50%;background:${activePhase.color};display:inline-block;"></span>
-        <div style="font-size:15px;font-weight:700;">${activePhase.label} phase</div>
+        <div style="font-size:15px;font-weight:700;">${activePhase.label} phase <span style="color:var(--sub);font-weight:600;">· ${esc(activePhase.nickname)}</span></div>
       </div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:16px;">${activePhase.length}</div>
-      <div class="food-groups-grid">
+      <div style="font-size:12px;color:var(--sub);margin-bottom:14px;">${activePhase.length}</div>
+
+      <div class="cycle-detail-row">
+        <i class="ti ti-sparkles" style="color:${activePhase.color};"></i>
+        <div><span class="cycle-detail-label">What's happening</span>${esc(activePhase.whatsHappening)}</div>
+      </div>
+
+      <div class="cycle-detail-two-col">
+        <div class="cycle-detail-row">
+          <i class="ti ti-barbell" style="color:${activePhase.color};"></i>
+          <div><span class="cycle-detail-label">Workouts</span>${esc(activePhase.workouts)}</div>
+        </div>
+        <div class="cycle-detail-row">
+          <i class="ti ti-users" style="color:${activePhase.color};"></i>
+          <div><span class="cycle-detail-label">Social</span>${esc(activePhase.social)}</div>
+        </div>
+      </div>
+
+      <div class="food-groups-grid" style="margin-top:18px;">
         ${activePhase.groups.map((g) => `<div><div class="food-group-label">${g.name}</div><div class="food-group-items">${esc(g.items)}</div></div>`).join('')}
       </div>
     </div>

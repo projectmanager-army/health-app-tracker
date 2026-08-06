@@ -197,34 +197,62 @@ export const EQUIPMENT_DEFAULTS = [
 ];
 
 export const CYCLE_DATA = {
-  menstrual: { label: 'Menstrual', color: 'var(--coral)', soft: 'var(--coral-soft)', length: '"Winter" · days 1–5', note: '"Winter" — rest, iron-rich foods, gentle movement.', groups: [
-    { name: 'Veggies', items: 'Kale, beets, mushrooms, sea veggies, sweet potato, root veggies' },
-    { name: 'Fruits', items: 'Dark berries, concord grapes, watermelon' },
-    { name: 'Grains', items: 'Buckwheat, wild rice' },
-    { name: 'Protein', items: 'Kidney beans, sardines, grass-fed red meat, shellfish' },
-    { name: 'Extras', items: 'Miso, sea salt, trace minerals, dark chocolate' },
-  ] },
-  follicular: { label: 'Follicular', color: 'var(--teal)', soft: 'var(--teal-soft)', length: '"Spring" · days 6–13', note: '"Spring" — rising energy, good for harder sessions.', groups: [
-    { name: 'Veggies', items: 'Artichokes, broccoli, carrots, lettuces, zucchini' },
-    { name: 'Fruits', items: 'Avocado, citrus, pomegranate, plum' },
-    { name: 'Grains', items: 'Oats, barley, rye' },
-    { name: 'Protein', items: 'Lentils, eggs, poultry, trout, shellfish' },
-    { name: 'Extras', items: 'Nut butter, olives, sauerkraut, kimchi' },
-  ] },
-  ovulatory: { label: 'Ovulatory', color: 'var(--phase4)', soft: 'rgba(255,92,52,0.14)', length: '"Summer" · days 14–16', note: '"Summer" — peak energy, best window for PRs.', groups: [
-    { name: 'Veggies', items: 'Brussels sprouts, bell pepper, asparagus, spinach' },
-    { name: 'Fruits', items: 'Coconut, fig, strawberry, cantaloupe' },
-    { name: 'Grains', items: 'Quinoa, amaranth' },
-    { name: 'Protein', items: 'Wild-caught salmon, eggs, tuna, shrimp, lamb' },
-    { name: 'Extras', items: 'Dark chocolate, maca, kimchi, sauerkraut' },
-  ] },
-  luteal: { label: 'Luteal', color: 'var(--phase3)', soft: 'rgba(122,63,91,0.14)', length: '"Fall" · days 17–28', note: '"Fall" — energy tapering, prioritize recovery.', groups: [
-    { name: 'Veggies', items: 'Cabbage, cauliflower, celery, sweet potato, squash' },
-    { name: 'Fruits', items: 'Apple, date, peach, pear' },
-    { name: 'Grains', items: 'Brown rice, millet' },
-    { name: 'Protein', items: 'Chickpea, navy bean, turkey, cod, grass-fed beef' },
-    { name: 'Extras', items: 'Dark chocolate, peppermint tea, magnesium' },
-  ] },
+  menstrual: {
+    label: 'Menstrual', nickname: 'Inner Winter', color: 'var(--coral)', soft: 'var(--coral-soft)',
+    length: '"Winter" · days 1–5', note: '"Winter" — rest, iron-rich foods, gentle movement.',
+    whatsHappening: 'Estrogen and progesterone drop to their lowest point, triggering your period. Energy, body temperature, and pain tolerance all bottom out here — the most inward phase of the cycle.',
+    workouts: 'Gentle and restorative — yin yoga, walking, easy stretching. De-load your weights and listen to your body; rest is productive here, not a setback.',
+    social: 'Low-key and restful — movie nights, journaling, solo downtime. Protect this space rather than pushing through a full social calendar.',
+    groups: [
+      { name: 'Fruits & vegetables', items: 'Kale, spinach, sea veggies (kelp, kombu, seaweed), mushrooms, beets, root veggies, sweet potato, blackberries, blueberries, citrus, tomatoes, watermelon, concord grapes' },
+      { name: 'Legumes & grains', items: 'Black rice, wild rice, buckwheat, black beans, kidney beans' },
+      { name: 'Proteins', items: 'Grass-fed red meat, beef, pork, shellfish, sardines, tofu, tempeh' },
+      { name: 'Extras', items: 'Flaxseed, pumpkin seeds, bone broth / mineral broth, magnesium, miso, sea salt, trace minerals, dark chocolate' },
+      { name: 'Snacks', items: 'Seaweed snacks, kale chips, dark chocolate, warm soup' },
+    ],
+  },
+  follicular: {
+    label: 'Follicular', nickname: 'Inner Spring', color: 'var(--teal)', soft: 'var(--teal-soft)',
+    length: '"Spring" · days 6–13', note: '"Spring" — rising energy, good for harder sessions.',
+    whatsHappening: 'Estrogen begins climbing as follicles develop, gradually lifting energy, mood, and cognitive sharpness out of the menstrual low.',
+    workouts: 'Cardio and higher-rep strength work land well here — energy and aerobic capacity are climbing, so it’s a good window to build volume.',
+    social: 'Rising energy supports being more outgoing — good phase for trying new things, planning ahead, and putting yourself out there.',
+    groups: [
+      { name: 'Fruits & vegetables', items: 'Artichokes, green beans, green peas, carrots, zucchini, arugula, lettuce, broccoli, avocado, grapefruit, lemon/lime, orange, pomegranate, plum' },
+      { name: 'Legumes & grains', items: 'Oats, green lentils, butter beans, barley, rye' },
+      { name: 'Proteins', items: 'Eggs, chicken, poultry, white fish, trout, tempeh, shellfish' },
+      { name: 'Extras', items: 'Flaxseed, pumpkin seeds, kimchi, sauerkraut, yogurt, olives, nut butter' },
+      { name: 'Snacks', items: 'Kombucha, pickles, cashews' },
+    ],
+  },
+  ovulatory: {
+    label: 'Ovulatory', nickname: 'Inner Summer', color: 'var(--phase4)', soft: 'rgba(255,92,52,0.14)',
+    length: '"Summer" · days 14–16', note: '"Summer" — peak energy, best window for PRs.',
+    whatsHappening: 'Estrogen peaks and testosterone rises around ovulation — the highest-energy, highest-confidence window of the cycle.',
+    workouts: 'Your highest-intensity window — HIIT, heavy strength, and your hardest efforts of the cycle fit best here. Good time to chase a workout PR.',
+    social: 'Communication and confidence tend to peak — best window for socializing, big conversations, and dates.',
+    groups: [
+      { name: 'Fruits & vegetables', items: 'Brussels sprouts, asparagus, chard, spinach, bell pepper, eggplant, tomato, corn, strawberry, raspberry, coconut, fig, cantaloupe' },
+      { name: 'Legumes & grains', items: 'Quinoa, red lentils, amaranth, corn' },
+      { name: 'Proteins', items: 'Wild-caught salmon, shrimp, tuna, chicken, eggs, lamb' },
+      { name: 'Extras', items: 'Flaxseed + pumpkin seeds (days 14–15), sesame + sunflower seeds (day 16 on), turmeric, green tea / matcha, maca, dark chocolate' },
+      { name: 'Snacks', items: 'Dark chocolate, almonds' },
+    ],
+  },
+  luteal: {
+    label: 'Luteal', nickname: 'Inner Autumn', color: 'var(--phase3)', soft: 'rgba(122,63,91,0.14)',
+    length: '"Fall" · days 17–28', note: '"Fall" — energy tapering, prioritize recovery.',
+    whatsHappening: 'Progesterone rises then falls sharply with estrogen near the end of the phase — energy and mood can dip in the back half as PMS symptoms build.',
+    workouts: 'Moderate strength training early in the phase, tapering toward lower-intensity, longer cardio and restorative work as it progresses.',
+    social: 'Prioritize self-care and lower-key plans, especially in the back half — protect downtime as symptoms build.',
+    groups: [
+      { name: 'Fruits & vegetables', items: 'Cabbage, cauliflower, celery, cucumber, ginger, garlic, leek, onion, pumpkin, squash, sweet potato, tart cherry, apple, date, peach, pear, banana' },
+      { name: 'Legumes & grains', items: 'Brown rice, millet, chickpeas, white beans, navy beans' },
+      { name: 'Proteins', items: 'Cod, halibut, turkey, grass-fed beef' },
+      { name: 'Extras', items: 'Sunflower seeds, sesame seeds, mint / spearmint / peppermint tea, magnesium, ashwagandha' },
+      { name: 'Snacks', items: 'Walnuts, dark chocolate' },
+    ],
+  },
 };
 
 export function cyclePhaseForDay(day) {
