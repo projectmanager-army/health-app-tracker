@@ -30,9 +30,10 @@ function defaultState() {
     customMobility: MOBILITY_DEFAULTS.map((m) => ({ ...m })),
     customSupplements: SUPPLEMENT_DEFAULTS.map((s) => ({ ...s })),
     daily: {}, // date -> { mobility:{id:bool}, mouthTape:bool, supplements:{id:bool}, checklist:{id:bool}, proteinGrams, waterMl, nasalToday, achillesToday }
-    coachMessages: [], // {role: 'user'|'assistant', content, ts} -- AI coach chat history
+    coachMessages: [], // {role, content, ts, proposals?} -- AI coach chat history. proposals: [{id, date, type, detail, reason, status: 'pending'|'applied'|'dismissed'}]
     healthProfile: '', // free-text medical/lifestyle background, sent to the coach on every message so it doesn't need re-explaining
     coachMemory: [], // {id, text, ts} -- durable facts the coach has picked up from conversation, carried forward beyond the chat window
+    planOverrides: {}, // iso date -> {type, detail, reason} -- coach-proposed (and athlete-approved) swaps to that day's template-generated workout
     darkMode: true,
     racePhoto: null,
   };

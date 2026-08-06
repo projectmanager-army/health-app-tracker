@@ -346,13 +346,42 @@ ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
 ANTHROPIC_MODEL = 'claude-sonnet-5'
 ANTHROPIC_VERSION = '2023-06-01'
 
+# Calling this tool only ever produces a proposal the client renders as an
+# Apply/Dismiss card -- nothing is written to the athlete's plan until they
+# click Apply. See coach_reply()/extract_proposals() for how the tool_use
+# block is turned into that card.
+COACH_TOOLS = [
+    {
+        'name': 'propose_plan_change',
+        'description': (
+            "Propose changing a specific day's planned workout. This does NOT apply the "
+            "change -- it only surfaces a card in the app that the athlete must explicitly "
+            "approve before their plan actually changes."
+        ),
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'date': {'type': 'string', 'description': 'ISO date (YYYY-MM-DD) of the day to change, must be today or later this week'},
+                'type': {'type': 'string', 'description': "New short workout title, e.g. 'Easy Run' or 'Full Rest'"},
+                'detail': {'type': 'string', 'description': 'New workout detail/instructions for that day'},
+                'reason': {'type': 'string', 'description': "One sentence explaining why, grounded in the athlete's actual data"},
+            },
+            'required': ['date', 'type', 'detail', 'reason'],
+        },
+    },
+]
+
+ISO_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
 COACH_SYSTEM_TEMPLATE = """You are an experienced, encouraging running coach embedded in the athlete's personal Honolulu Marathon training tracker web app. Ground every answer in the live training data below — never invent numbers that aren't there.
 
 Race: Honolulu Marathon, December 13, 2026.
 {health_profile_section}{memory_section}
 Non-negotiables baked into this plan (don't casually suggest dropping these): nasal breathing on easy runs, daily achilles/toe-spacer mobility work, midfoot strike focus, heat-adaptation long runs scheduled 10am–2pm before Peak phase, walk breaks allowed on long runs.
 
-You cannot edit the plan yourself — the app only lets the athlete change it. If you think a specific day's workout should change (low readiness, high recent mileage, missed sessions, soreness they mention, etc.), say so plainly, explain your reasoning from the data, and tell them to update it themselves if they agree. Be specific and concise -- a few sentences to a short paragraph is usually enough, not an exhaustive breakdown -- and ask a clarifying question if the data below doesn't cover what you'd need to answer well.
+You can propose changing a specific day's planned workout with the propose_plan_change tool -- use it when the data genuinely supports a change (low readiness, high recent mileage, missed sessions, soreness they mention, a pattern in "things you've learned", etc.), not reflexively. Calling the tool does NOT change anything by itself -- it surfaces a card in the app that the athlete has to explicitly approve before it takes effect, so there's no risk in proposing when you're fairly confident; they're always the final decision-maker. Only propose changes for today or a day later this week that's in the "Current status" below -- you don't have visibility into future weeks, so don't propose changes there. Never propose changing race day itself. When you do call the tool, you can still write normal reply text alongside it (e.g. explain your reasoning); you don't need to (and shouldn't) also describe the exact new workout in prose since the card already shows it.
+
+Be specific and concise -- a few sentences to a short paragraph is usually enough, not an exhaustive breakdown -- and ask a clarifying question if the data below doesn't cover what you'd need to answer well.
 
 If the athlete tells you something durable worth remembering for future conversations -- an injury detail, a preference, a recurring pattern, a goal, anything not already covered below or in "things you've learned" -- put one line per new fact at the very START of your response, before anything else, formatted exactly as "MEMORY: <short fact>". Put these first (not at the end) so they're never lost if your reply runs long. Only do this for genuinely new information they just told you -- most replies won't need one. These lines are stripped out before the athlete sees your reply, so never refer to them in the visible answer.
 
@@ -398,6 +427,26 @@ def extract_memories(text):
     cleaned = MEMORY_LINE_RE.sub('', text)
     cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
     return cleaned, memories
+
+
+def extract_proposals(content_blocks):
+    """Pulls propose_plan_change tool calls out of the response content and
+    validates them -- the client trusts this shape directly to render a
+    card and (if approved) key state.planOverrides by date, so a malformed
+    tool call should be dropped here rather than reaching the browser."""
+    proposals = []
+    for block in content_blocks:
+        if block.get('type') != 'tool_use' or block.get('name') != 'propose_plan_change':
+            continue
+        args = block.get('input') or {}
+        date = str(args.get('date', '')).strip()
+        workout_type = str(args.get('type', '')).strip()[:80]
+        detail = str(args.get('detail', '')).strip()[:500]
+        reason = str(args.get('reason', '')).strip()[:300]
+        if not ISO_DATE_RE.match(date) or not workout_type or not detail:
+            continue
+        proposals.append({'date': date, 'type': workout_type, 'detail': detail, 'reason': reason})
+    return proposals
 
 
 def format_coach_context(context):
@@ -491,6 +540,7 @@ def coach_reply(config, messages, context):
         'max_tokens': 1536,
         'system': system,
         'messages': safe_messages,
+        'tools': COACH_TOOLS,
     }
     try:
         data = http_request_json(ANTHROPIC_API, payload, headers={
@@ -504,13 +554,21 @@ def coach_reply(config, messages, context):
     except Exception:
         return {'error': 'network'}
 
-    text = ''.join(
-        block.get('text', '') for block in data.get('content', []) if block.get('type') == 'text'
-    )
+    content_blocks = data.get('content', [])
+    text = ''.join(block.get('text', '') for block in content_blocks if block.get('type') == 'text')
     cleaned_text, new_memories = extract_memories(text)
+    proposals = extract_proposals(content_blocks)
+    if not cleaned_text and proposals:
+        # The model sometimes calls the tool with no accompanying prose --
+        # the card speaks for itself, but the chat bubble still needs *some*
+        # text so the conversation history (and the UI) has something to show.
+        cleaned_text = 'Here’s what I’d suggest — take a look at the card below.'
+
     result = {'reply': cleaned_text}
     if new_memories:
         result['memories'] = new_memories
+    if proposals:
+        result['proposals'] = proposals
     return result
 
 

@@ -181,6 +181,17 @@ function currentWeek() {
   return WEEKS[weekIdx];
 }
 
+// Applies a coach-proposed (and athlete-approved) override on top of a
+// template-generated plan day, if one exists for that date. Every read site
+// that shows a specific day's workout routes through this so an override is
+// reflected consistently everywhere (sidebar, Plan tab, day-detail modal,
+// and the coach's own context) rather than just in one place.
+function getPlanDay(templateDay) {
+  const override = state.planOverrides[templateDay.iso];
+  if (!override) return templateDay;
+  return { ...templateDay, type: override.type, detail: override.detail, code: '📝', overridden: true, overrideReason: override.reason, originalType: templateDay.type, originalDetail: templateDay.detail };
+}
+
 function weeklyKm() {
   // "km this week" on Home is Strava-only (manual shoe-log entries have no
   // `source` field), so it reflects actual recorded runs, not manual km edits.
@@ -226,8 +237,9 @@ function buildCoachTrends() {
 function buildCoachContext() {
   const wk = currentWeek();
   const { dayIdx } = currentWeekInfo();
-  const todayEntry = wk.days[dayIdx];
-  const restOfWeek = wk.days.slice(dayIdx).filter((d) => d !== todayEntry);
+  const rawToday = wk.days[dayIdx];
+  const todayEntry = getPlanDay(rawToday);
+  const restOfWeek = wk.days.slice(dayIdx).filter((d) => d !== rawToday).map((d) => getPlanDay(d));
 
   const cutoffIso = isoDate(addDays(new Date(), -14));
   const recentStravaRuns = state.runLog
@@ -349,7 +361,7 @@ function renderSidebar() {
   const digits = String(daysToRace).padStart(3, '0').split('');
   const wk = currentWeek();
   const { dayIdx } = currentWeekInfo();
-  const todayDay = wk.days[dayIdx];
+  const todayDay = getPlanDay(wk.days[dayIdx]);
   const readiness = getReadiness();
   const day = getDay(state, ui.viewDate);
 
@@ -386,9 +398,10 @@ function renderSidebar() {
     </div>
 
     <div class="card card-pad-sm">
-      <div class="today-eyebrow">Today's session</div>
+      <div class="today-eyebrow">Today's session${todayDay.overridden ? ' <span class="override-pill">Changed by coach</span>' : ''}</div>
       <div class="today-type">${esc(todayDay.type)}</div>
       <div class="today-detail">${esc(todayDay.detail)}</div>
+      ${todayDay.overridden ? `<div class="override-note">Was: ${esc(todayDay.originalType)} — ${esc(todayDay.overrideReason || 'coach suggestion')} <button class="revert-override-btn" data-action="revert-plan-override" data-date="${todayDay.iso}">Revert</button></div>` : ''}
       ${readiness < 70 ? `<div class="recovery-note"><i class="ti ti-battery-2"></i>Readiness is low — consider an easier version.</div>` : ''}
       <div class="today-coaching">
         <div class="today-coaching-row"><i class="ti ti-map-pin"></i><div>${wk.phaseIdx >= 3 ? 'Try to run 10am–2pm today to simulate Honolulu heat.' : 'Flat, familiar route — save new terrain for down weeks.'}</div></div>
@@ -741,7 +754,8 @@ function renderPlan() {
   const { weekIdx, dayIdx } = currentWeekInfo();
   const wk = currentWeek();
 
-  const thisWeekDays = wk.days.map((d, i) => {
+  const thisWeekDays = wk.days.map((rawD, i) => {
+    const d = getPlanDay(rawD);
     const isToday = i === dayIdx;
     const short = d.type.length > 20 ? d.type.slice(0, 18) + '…' : d.type;
     return { d, isToday, short };
@@ -761,6 +775,7 @@ function renderPlan() {
     <div class="this-week-grid">
       ${thisWeekDays.map(({ d, isToday, short }) => `
         <div class="this-week-day ${isToday ? 'today' : ''}" data-action="open-day" data-week="${wk.week}" data-day="${d.day}">
+          ${d.overridden ? `<div class="this-week-day-override-dot" title="Changed by coach"></div>` : ''}
           <div class="this-week-day-name">${d.label.split(' ')[0]}</div>
           <div class="this-week-day-num">${d.label.split(' ').slice(-1)[0]}</div>
           <div class="this-week-day-icon-wrap">
@@ -774,7 +789,8 @@ function renderPlan() {
       <div class="week-row">
         <div class="week-row-label">Week ${w.week}<div class="week-row-date">${w.dateLabel}</div></div>
         <div class="week-row-days">
-          ${w.days.map((d) => {
+          ${w.days.map((rawD) => {
+            const d = getPlanDay(rawD);
             const isToday = w.week === weekIdx + 1 && d.day === dayIdx;
             const bg = isToday ? w.phaseColor : w.phaseSoft;
             const fg = isToday ? '#fff' : w.phaseColor;
@@ -1164,6 +1180,27 @@ function renderRace() {
 
 // ---------------- coach ----------------
 
+function formatIsoLabel(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function renderProposalCard(p) {
+  const statusLabel = p.status === 'applied' ? '<i class="ti ti-check"></i> Applied to plan' : p.status === 'dismissed' ? 'Dismissed' : '';
+  return `
+  <div class="coach-proposal-card" data-status="${p.status}">
+    <div class="coach-proposal-date"><i class="ti ti-calendar-event"></i> ${esc(formatIsoLabel(p.date))}</div>
+    <div class="coach-proposal-type">${esc(p.type)}</div>
+    <div class="coach-proposal-detail">${esc(p.detail)}</div>
+    <div class="coach-proposal-reason">${esc(p.reason)}</div>
+    ${p.status === 'pending' ? `
+      <div class="coach-proposal-actions">
+        <button class="coach-proposal-dismiss-btn" data-action="dismiss-plan-proposal" data-id="${p.id}">Dismiss</button>
+        <button class="coach-proposal-apply-btn" data-action="apply-plan-proposal" data-id="${p.id}">Apply to plan</button>
+      </div>` : `<div class="coach-proposal-status-label">${statusLabel}</div>`}
+  </div>`;
+}
+
 function renderCoachWidget() {
   const messages = state.coachMessages || [];
   const errorMessages = {
@@ -1190,7 +1227,10 @@ function renderCoachWidget() {
     <div class="coach-messages" id="coach-messages">
       ${messages.length === 0
         ? `<div class="coach-empty-hint">Ask about today's workout, whether to adjust based on how you're feeling, or how this week's mileage looks against your plan.${state.healthProfile ? '' : ' Tap the notes icon above to add your health profile once so I don’t need it re-explained every time.'}</div>`
-        : messages.map((m) => `<div class="coach-msg ${m.role}">${esc(m.content).replace(/\n/g, '<br>')}</div>`).join('')}
+        : messages.map((m) => `
+          <div class="coach-msg ${m.role}">${esc(m.content).replace(/\n/g, '<br>')}</div>
+          ${(m.proposals || []).map(renderProposalCard).join('')}
+        `).join('')}
       ${ui.coachLoading ? `<div class="coach-msg assistant coach-typing"><span></span><span></span><span></span></div>` : ''}
       ${errorHint ? `<div class="coach-error-hint">${esc(errorHint)}</div>` : ''}
     </div>
@@ -1227,7 +1267,12 @@ async function sendCoachMessage() {
     if (res.error) {
       ui.coachError = res.error;
     } else if (res.reply) {
-      state.coachMessages = [...state.coachMessages, { role: 'assistant', content: res.reply, ts: Date.now() }];
+      const proposals = Array.isArray(res.proposals) ? res.proposals.map((p) => ({
+        id: 'prop-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        date: p.date, type: p.type, detail: p.detail, reason: p.reason,
+        status: 'pending',
+      })) : [];
+      state.coachMessages = [...state.coachMessages, { role: 'assistant', content: res.reply, ts: Date.now(), proposals }];
       if (Array.isArray(res.memories) && res.memories.length) addCoachMemories(res.memories);
       persist();
     }
@@ -1252,6 +1297,41 @@ function addCoachMemories(facts) {
     .map((text) => ({ id: 'mem-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), text, ts: Date.now() }));
   if (!additions.length) return;
   state.coachMemory = [...state.coachMemory, ...additions].slice(-COACH_MEMORY_CAP);
+}
+
+// Finds a proposal by id across all coach messages (they're small in number
+// and this only runs on click, so a linear scan is plenty).
+function findProposal(proposalId) {
+  for (const m of state.coachMessages) {
+    const p = (m.proposals || []).find((x) => x.id === proposalId);
+    if (p) return p;
+  }
+  return null;
+}
+
+function applyPlanProposal(proposalId) {
+  const p = findProposal(proposalId);
+  if (!p || p.status !== 'pending') return;
+  state.planOverrides = { ...state.planOverrides, [p.date]: { type: p.type, detail: p.detail, reason: p.reason } };
+  p.status = 'applied';
+  persist(); render();
+  toast(`Updated ${p.date}`);
+}
+
+function dismissPlanProposal(proposalId) {
+  const p = findProposal(proposalId);
+  if (!p || p.status !== 'pending') return;
+  p.status = 'dismissed';
+  persist(); render();
+}
+
+function revertPlanOverride(iso) {
+  if (!state.planOverrides[iso]) return;
+  const next = { ...state.planOverrides };
+  delete next[iso];
+  state.planOverrides = next;
+  persist(); render();
+  toast('Reverted to original plan');
 }
 
 function clearCoachChat() {
@@ -1287,15 +1367,22 @@ function renderModals() {
   let html = '';
 
   if (ui.selectedDay) {
-    const d = ui.selectedDay;
+    const selWk = WEEKS[ui.selectedDay.week - 1];
+    const d = { week: ui.selectedDay.week, ...getPlanDay(selWk.days[ui.selectedDay.day]) };
     html += `
     <div class="modal-overlay" data-action="close-day">
       <div class="modal" data-action="stop">
         <div class="modal-head">
-          <div><div class="modal-eyebrow">Week ${d.week} · ${d.label}</div><div class="modal-title">${esc(d.type)}</div></div>
+          <div><div class="modal-eyebrow">Week ${d.week} · ${d.label}${d.overridden ? ' <span class="override-pill">Changed by coach</span>' : ''}</div><div class="modal-title">${esc(d.type)}</div></div>
           <button class="modal-close" data-action="close-day"><i class="ti ti-x"></i></button>
         </div>
         <div class="modal-body">${esc(d.detail)}</div>
+        ${d.overridden ? `
+          <div class="override-note" style="margin-top:14px;">
+            Originally: <strong>${esc(d.originalType)}</strong> — ${esc(d.originalDetail)}<br>
+            ${esc(d.overrideReason || 'coach suggestion')}
+            <button class="revert-override-btn" data-action="revert-plan-override" data-date="${d.iso}">Revert to original</button>
+          </div>` : ''}
       </div>
     </div>`;
   }
@@ -1966,11 +2053,11 @@ document.addEventListener('click', (e) => {
     case 'protein-lookup-search': proteinLookupSearch(); break;
     case 'protein-lookup-add': proteinLookupAdd(parseInt(target.dataset.grams, 10)); break;
     case 'open-day': {
-      const week = parseInt(target.dataset.week, 10);
-      const dayIdx = parseInt(target.dataset.day, 10);
-      const wk = WEEKS[week - 1];
-      const d = wk.days[dayIdx];
-      ui.selectedDay = { week, label: d.label, type: d.type, detail: d.detail };
+      // Store just the reference, not a snapshot -- renderModals() resolves
+      // the actual day (including any override) fresh on every render, so
+      // this stays correct if the plan changes while the modal is open
+      // (e.g. reverting an override from the sidebar behind it).
+      ui.selectedDay = { week: parseInt(target.dataset.week, 10), day: parseInt(target.dataset.day, 10) };
       render();
       break;
     }
@@ -2004,6 +2091,9 @@ document.addEventListener('click', (e) => {
     case 'close-health-profile-edit': closeHealthProfileEdit(); break;
     case 'save-health-profile-edit': saveHealthProfileEdit(); break;
     case 'delete-coach-memory': deleteCoachMemory(id); break;
+    case 'apply-plan-proposal': applyPlanProposal(id); break;
+    case 'dismiss-plan-proposal': dismissPlanProposal(id); break;
+    case 'revert-plan-override': revertPlanOverride(target.dataset.date); break;
     case 'stop': e.stopPropagation(); break;
     default: break;
   }
