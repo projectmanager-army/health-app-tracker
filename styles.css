@@ -480,15 +480,27 @@ select.form-input{appearance:none;-webkit-appearance:none;}
   .coach-close-btn, .coach-clear-btn, .coach-profile-btn, .memory-delete-btn,
   .daynav-arrow, .daynav-today-btn, .row-edit-btn, .add-item-btn, .cycle-phase-btn,
   .period-btn, .modal-close, .shoe-remove-btn, .header-readiness {
-    transition: transform .14s ease, background-color .15s ease, box-shadow .15s ease, opacity .15s ease, color .15s ease;
+    transition: transform .14s ease, background-color .15s ease, box-shadow .15s ease, opacity .15s ease, color .15s ease, filter .15s ease;
   }
+
+  /* hover states -- declared before :active below so a press mid-hover still
+     shows the press-scale, not the hover style (equal-specificity cascade
+     is source-order dependent) */
+  .nav-btn:hover:not(.active) { background: var(--surface2); color: var(--text); }
+  .quick-add-btn:hover, .btn-ghost:hover, .row-edit-btn:hover, .add-item-btn:hover,
+  .coach-profile-btn:hover, .memory-delete-btn:hover, .daynav-arrow:hover, .modal-close:hover,
+  .coach-close-btn:hover, .coach-clear-btn:hover {
+    filter: brightness(1.12);
+  }
+  .check:hover:not(.done) { transform: scale(1.08); }
+  .coach-fab:hover { transform: scale(1.06); }
+
   button:active, .check:active, .quick-add-btn:active, .btn-ghost:active, .nav-btn:active,
   .coach-fab:active, .coach-send-btn:active, .coach-close-btn:active, .daynav-arrow:active,
   .daynav-today-btn:active, .row-edit-btn:active, .add-item-btn:active, .cycle-phase-btn:active,
   .period-btn:active, .modal-close:active, .shoe-remove-btn:active {
     transform: scale(0.94);
   }
-  .coach-fab:hover { transform: scale(1.06); }
 
   .mobility-row, .supp-row, .equipment-row, .shoe-card, .checklist-row,
   .link-card, .link-card-dark, .cold-heat-card, .this-week-day, .week-day-chip, .nightly-row, .prerace-row {
@@ -500,6 +512,37 @@ select.form-input{appearance:none;-webkit-appearance:none;}
     transform: translateY(-2px);
     box-shadow: var(--shadow-hover);
   }
+
+  /* gradient icon depth -- the icon glyph's own gradient sweeps across it,
+     and its backdrop blob breathes, whenever the cursor is over the icon */
+  .gradient-icon-blob { transition: transform .3s ease, opacity .3s ease; }
+  .gradient-icon { background-size: 220% 220%; background-position: 0% 50%; transition: background-position .45s ease; }
+  .gradient-icon-wrap:hover .gradient-icon-blob { transform: scale(1.18); opacity: 0.75; }
+  .gradient-icon-wrap:hover .gradient-icon { background-position: 100% 50%; }
+
+  /* ambient gradient movement -- slow, continuous, and confined to the
+     handful of elements that only ever appear once or a few times on
+     screen (this app re-renders its whole DOM on every state change, so a
+     looping ambient animation tolerates that fine, but the same treatment
+     applied to something repeated 20+ times on a list page would feel busy) */
+  @keyframes blobDrift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(6px, -8px) scale(1.05); }
+    66% { transform: translate(-6px, 6px) scale(0.97); }
+  }
+  .countdown-card .blob { animation: blobDrift 10s ease-in-out infinite; }
+  .countdown-card .blob:nth-child(2) { animation-duration: 13s; animation-delay: -4s; }
+  .countdown-card .blob:nth-child(3) { animation-duration: 8s; animation-delay: -2s; }
+
+  @keyframes gradientDrift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .countdown-digit { background-size: 200% 200%; animation: gradientDrift 6s ease-in-out infinite; }
+  .race-hero { background-size: 200% 200%; animation: gradientDrift 12s ease-in-out infinite; }
+
+  .header-logo img { transition: transform .3s ease; }
+  .header-logo:hover img { transform: rotate(-6deg) scale(1.08); }
 
   /* checkbox completion pop */
   @keyframes checkPop {
