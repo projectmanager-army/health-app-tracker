@@ -2,7 +2,7 @@
 
 :root{
   --bg:#F5F2EC;--surface:#FFFFFF;--surface2:#ECE7DD;--text:#20221E;--sub:#83867E;
-  --border:rgba(30,30,20,0.06);--shadow:0 4px 18px rgba(30,30,20,0.06);
+  --border:rgba(30,30,20,0.06);--shadow:0 4px 18px rgba(30,30,20,0.06);--shadow-hover:0 12px 28px rgba(30,30,20,0.14);
   --teal:#E9F056;--teal-soft:#F7F6D0;--teal-text:#54530A;
   --amber-soft:#F7F6D4;--amber-text:#7A7305;
   --coral:#FF5C34;--coral-soft:#FFE6DD;
@@ -11,7 +11,7 @@
 }
 [data-theme="dark"]{
   --bg:#0B0C0B;--surface:#171815;--surface2:#1F211D;--text:#F2F0E9;--sub:#8C8F86;
-  --border:rgba(255,255,255,0.04);--shadow:0 4px 22px rgba(0,0,0,0.5);
+  --border:rgba(255,255,255,0.04);--shadow:0 4px 22px rgba(0,0,0,0.5);--shadow-hover:0 12px 28px rgba(0,0,0,0.6);
   --teal:#E9F056;--teal-soft:rgba(233,240,86,0.16);--teal-text:#E9F056;
   --amber-soft:rgba(233,240,86,0.14);--amber-text:#E9F056;
   --coral:#FF8B69;--coral-soft:rgba(255,92,52,0.16);
@@ -473,3 +473,71 @@ select.form-input{appearance:none;-webkit-appearance:none;}
   flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;}
 .coach-send-btn:disabled,.coach-input:disabled{opacity:0.5;}
 .integ-hint code{background:var(--surface2);border-radius:4px;padding:1px 5px;font-size:11px;}
+
+/* ---------- micro-interactions ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  button, .check, .quick-add-btn, .btn-ghost, .nav-btn, .coach-fab, .coach-send-btn,
+  .coach-close-btn, .coach-clear-btn, .coach-profile-btn, .memory-delete-btn,
+  .daynav-arrow, .daynav-today-btn, .row-edit-btn, .add-item-btn, .cycle-phase-btn,
+  .period-btn, .modal-close, .shoe-remove-btn, .header-readiness {
+    transition: transform .14s ease, background-color .15s ease, box-shadow .15s ease, opacity .15s ease, color .15s ease;
+  }
+  button:active, .check:active, .quick-add-btn:active, .btn-ghost:active, .nav-btn:active,
+  .coach-fab:active, .coach-send-btn:active, .coach-close-btn:active, .daynav-arrow:active,
+  .daynav-today-btn:active, .row-edit-btn:active, .add-item-btn:active, .cycle-phase-btn:active,
+  .period-btn:active, .modal-close:active, .shoe-remove-btn:active {
+    transform: scale(0.94);
+  }
+  .coach-fab:hover { transform: scale(1.06); }
+
+  .mobility-row, .supp-row, .equipment-row, .shoe-card, .checklist-row,
+  .link-card, .link-card-dark, .cold-heat-card, .this-week-day, .week-day-chip, .nightly-row, .prerace-row {
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .link-card:hover, .link-card-dark:hover, .cold-heat-card:hover, .mobility-row:hover,
+  .supp-row:hover, .equipment-row:hover, .shoe-card:hover, .this-week-day:hover,
+  .week-day-chip:hover, .checklist-row:hover, .nightly-row:hover, .prerace-row:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  /* checkbox completion pop */
+  @keyframes checkPop {
+    0% { transform: scale(0.6); }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+  .check.done i { animation: checkPop .28s cubic-bezier(.34,1.56,.64,1); }
+
+  /* toast */
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .toast { animation: toastIn .22s ease-out; }
+
+  /* modals */
+  @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.96) translateY(6px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .modal-overlay { animation: overlayIn .15s ease-out; }
+  .modal-overlay .modal { animation: modalIn .2s cubic-bezier(.22,1,.36,1); }
+
+  /* floating coach panel + integrations popover */
+  @keyframes floatPanelIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .coach-panel { animation: floatPanelIn .2s cubic-bezier(.22,1,.36,1); transform-origin: bottom right; }
+  .readiness-popover { animation: floatPanelIn .18s cubic-bezier(.22,1,.36,1); transform-origin: top right; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
