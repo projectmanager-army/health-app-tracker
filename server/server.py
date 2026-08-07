@@ -377,7 +377,14 @@ COACH_TOOLS = [
     {
         'name': 'log_protein',
         'description': "Add protein in grams to today's total. Only call this when the athlete directly tells you they ate something.",
-        'input_schema': {'type': 'object', 'properties': {'grams': {'type': 'number'}}, 'required': ['grams']},
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'grams': {'type': 'number'},
+                'food': {'type': 'string', 'description': "What they ate, e.g. 'Chicken breast' -- shown in their protein log"},
+            },
+            'required': ['grams'],
+        },
     },
     {
         'name': 'log_mouth_tape',
@@ -503,7 +510,8 @@ def extract_log_actions(content_blocks):
         elif name == 'log_protein':
             g = args.get('grams')
             if isinstance(g, (int, float)) and 0 < g <= 500:
-                actions.append({'type': name, 'grams': round(g)})
+                food = str(args.get('food', '')).strip()[:80]
+                actions.append({'type': name, 'grams': round(g), 'food': food or None})
         elif name == 'log_mouth_tape':
             actions.append({'type': name})
         else:  # log_mobility_item / log_supplement / log_checklist_item

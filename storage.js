@@ -42,7 +42,7 @@ function defaultState() {
 function emptyDay() {
   return {
     mobility: {}, mouthTape: false, supplements: {}, checklist: {},
-    proteinGrams: 0, waterMl: 0, nasalToday: false, achillesToday: null,
+    proteinGrams: 0, proteinLog: [], waterMl: 0, nasalToday: false, achillesToday: null,
   };
 }
 

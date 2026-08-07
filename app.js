@@ -589,9 +589,9 @@ function renderHome() {
           <div class="ring-card-title">Protein${dayPill()}</div>
           <div class="ring-card-sub">${day.proteinGrams}g of 110g</div>
           <div class="quick-adds">
-            <button class="quick-add-btn" data-action="add-protein" data-g="7">+ Egg</button>
-            <button class="quick-add-btn" data-action="add-protein" data-g="25">+ Shake</button>
-            <button class="quick-add-btn" data-action="add-protein" data-g="30">+ Meal</button>
+            <button class="quick-add-btn" data-action="add-protein" data-g="7" data-label="Egg">+ Egg</button>
+            <button class="quick-add-btn" data-action="add-protein" data-g="25" data-label="Shake">+ Shake</button>
+            <button class="quick-add-btn" data-action="add-protein" data-g="30" data-label="Meal">+ Meal</button>
           </div>
         </div>
       </div>
@@ -925,16 +925,16 @@ function renderSupplements() {
         <div class="supp-hero-title">Protein ${isViewingToday() ? 'today' : viewDateLabel()}</div>
         <div class="supp-hero-sub">${day.proteinGrams}g of 110g target — recovery &amp; tendon repair.</div>
         <div class="quick-adds">
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="7">+ Egg (7g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="25">+ Shake (25g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="30">+ Meal (30g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="10">+ Snack (10g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="20">+ Greek Yogurt (20g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="31">+ Chicken Breast (31g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="25">+ Salmon (25g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="24">+ Protein Powder (24g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="8">+ Tofu (8g)</button>
-          <button class="quick-add-btn lg" data-action="add-protein" data-g="8">+ Peanut Butter (8g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="7" data-label="Egg">+ Egg (7g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="25" data-label="Shake">+ Shake (25g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="30" data-label="Meal">+ Meal (30g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="10" data-label="Snack">+ Snack (10g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="20" data-label="Greek Yogurt">+ Greek Yogurt (20g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="31" data-label="Chicken Breast">+ Chicken Breast (31g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="25" data-label="Salmon">+ Salmon (25g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="24" data-label="Protein Powder">+ Protein Powder (24g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="8" data-label="Tofu">+ Tofu (8g)</button>
+          <button class="quick-add-btn lg" data-action="add-protein" data-g="8" data-label="Peanut Butter">+ Peanut Butter (8g)</button>
           <button class="quick-add-btn reset" data-action="reset-protein">Reset</button>
         </div>
 
@@ -951,6 +951,16 @@ function renderSupplements() {
           </div>
           ${renderProteinLookupResult()}
         </div>
+
+        ${(day.proteinLog && day.proteinLog.length) ? `
+          <div class="protein-log-list">
+            <div class="protein-log-label">Added ${isViewingToday() ? 'today' : `on ${viewDateLabel()}`} (${day.proteinLog.length} ${day.proteinLog.length === 1 ? 'entry' : 'entries'})</div>
+            ${day.proteinLog.map((e) => `
+              <div class="protein-log-row">
+                <span class="protein-log-name">${esc(e.label)}</span>
+                <span class="protein-log-grams">+${e.grams}g</span>
+              </div>`).join('')}
+          </div>` : ''}
       </div>
     </div>
 
@@ -1337,6 +1347,7 @@ function applyCoachLogActions(actions) {
       summary.push(`+${a.ml}ml water`);
     } else if (a.type === 'log_protein' && typeof a.grams === 'number' && a.grams > 0) {
       patch.proteinGrams = Math.max(0, (patch.proteinGrams ?? day.proteinGrams) + a.grams);
+      patch.proteinLog = [...(patch.proteinLog || day.proteinLog || []), { label: a.food || 'Coach', grams: a.grams, ts: Date.now() }];
       summary.push(`+${a.grams}g protein`);
     } else if (a.type === 'log_mouth_tape') {
       patch.mouthTape = true;
@@ -1796,20 +1807,25 @@ function deleteEquipmentItem(id) {
   persist(); render();
   toast('Deleted');
 }
-function addProtein(g) {
+function addProtein(g, label) {
   const day = getDay(state, ui.viewDate);
-  setDay(state, ui.viewDate, { proteinGrams: Math.max(0, day.proteinGrams + g) });
+  const entry = { label: label || 'Added', grams: g, ts: Date.now() };
+  setDay(state, ui.viewDate, {
+    proteinGrams: Math.max(0, day.proteinGrams + g),
+    proteinLog: [...(day.proteinLog || []), entry],
+  });
   persist(); render();
 }
 function resetProtein() {
-  setDay(state, ui.viewDate, { proteinGrams: 0 });
+  setDay(state, ui.viewDate, { proteinGrams: 0, proteinLog: [] });
   persist(); render();
 }
 function addProteinManual() {
   const input = document.getElementById('protein-manual-input');
   const g = parseFloat(input.value);
   if (!g || g <= 0) return;
-  addProtein(Math.round(g));
+  addProtein(Math.round(g), 'Manual entry');
+  input.value = '';
 }
 async function proteinLookupSearch() {
   const query = ui.proteinLookupQuery.trim();
@@ -1827,7 +1843,8 @@ async function proteinLookupSearch() {
   render();
 }
 function proteinLookupAdd(grams) {
-  addProtein(grams);
+  const label = (ui.proteinLookupResult && ui.proteinLookupResult.description) || 'Added';
+  addProtein(grams, label);
   ui.proteinLookupQuery = '';
   ui.proteinLookupResult = null;
   toast(`Added ${grams}g protein`);
@@ -2117,7 +2134,7 @@ document.addEventListener('click', (e) => {
     case 'add-water': addWater(parseInt(target.dataset.ml, 10)); break;
     case 'reset-water': resetWater(); break;
     case 'add-water-manual': addWaterManual(); break;
-    case 'add-protein': addProtein(parseInt(target.dataset.g, 10)); break;
+    case 'add-protein': addProtein(parseInt(target.dataset.g, 10), target.dataset.label); break;
     case 'reset-protein': resetProtein(); break;
     case 'add-protein-manual': addProteinManual(); break;
     case 'protein-lookup-search': proteinLookupSearch(); break;

@@ -300,6 +300,13 @@ button{cursor:pointer;}
 .protein-lookup-match-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .protein-lookup-match-row input[type=number]{width:70px;}
 .protein-lookup-match-g{font-size:12.5px;color:var(--sub);}
+.protein-log-list{margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border);}
+.protein-log-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;}
+.protein-log-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:7px 0;border-bottom:0.5px solid var(--border);font-size:12.5px;}
+.protein-log-row:last-child{border-bottom:none;}
+.protein-log-name{color:var(--text);}
+.protein-log-grams{color:var(--teal-text);font-weight:700;font-variant-numeric:tabular-nums;flex:none;}
 .supp-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
 .supp-col-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
 .supp-col-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
