@@ -682,6 +682,21 @@ class Handler(BaseHTTPRequestHandler):
             return self.handle_api(path, query)
         return self.serve_static(path)
 
+    def do_HEAD(self):
+        # BaseHTTPRequestHandler 501s on HEAD unless a handler exists --
+        # browsers send these as navigation preflight, so a real page load
+        # was showing a spurious error in the console for something that
+        # otherwise worked fine.
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        if path.startswith('/api/') or path.startswith('/auth/'):
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
+        return self.serve_static(path, head_only=True)
+
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
@@ -771,7 +786,7 @@ class Handler(BaseHTTPRequestHandler):
 
         return self.send_json({'error': 'not_found'}, status=404)
 
-    def serve_static(self, path):
+    def serve_static(self, path, head_only=False):
         if path == '/':
             path = '/index.html'
         # prevent path traversal
@@ -783,18 +798,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({'error': 'not_found'}, status=404)
         ctype, _ = mimetypes.guess_type(full_path)
         ctype = ctype or 'application/octet-stream'
-        with open(full_path, 'rb') as f:
-            body = f.read()
+        size = os.path.getsize(full_path)
         self.send_response(200)
         self.send_header('Content-Type', ctype)
-        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Content-Length', str(size))
         # Force revalidation on every load -- this is a small personal app that
         # changes often; a browser silently serving a stale cached app.js or
         # favicon (which browsers cache especially aggressively) after a
         # deploy is worse than the minor cost of always re-fetching.
         self.send_header('Cache-Control', 'no-cache, must-revalidate')
         self.end_headers()
-        self.wfile.write(body)
+        if head_only:
+            return
+        with open(full_path, 'rb') as f:
+            self.wfile.write(f.read())
 
 
 def main():
