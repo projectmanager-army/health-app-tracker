@@ -339,6 +339,11 @@ button{cursor:pointer;}
 .shoe-body{display:flex;gap:18px;align-items:center;flex-wrap:wrap;min-width:0;}
 .shoe-ring{position:relative;width:88px;height:88px;flex:none;}
 .shoe-ring-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;}
+
+/* ring() progress circles -- static fallback so the correct value shows
+   even without the fill-in animation below (e.g. reduced motion). */
+.ring-progress,.ring-progress-glow{stroke-dashoffset:var(--ring-offset);}
+.ring-progress-glow{opacity:0.45;filter:blur(4px);}
 .shoe-name{font-size:15px;font-weight:700;overflow-wrap:break-word;}
 .shoe-sub{font-size:12.5px;color:var(--sub);margin-bottom:4px;overflow-wrap:break-word;}
 .shoe-km{font-size:14px;font-weight:600;}
@@ -576,6 +581,19 @@ select.form-input{appearance:none;-webkit-appearance:none;}
   }
   .countdown-digit { background-size: 200% 200%; animation: gradientDrift 6s ease-in-out infinite; }
   .race-hero { background-size: 200% 200%; animation: gradientDrift 12s ease-in-out infinite; }
+
+  /* progress ring fill-in -- animates from empty to its value on every
+     render (this app rebuilds the whole DOM on any state change, so
+     "every render" effectively means every time you look at it or the
+     data changes, which reads as intentional rather than glitchy since
+     there are only ever 1-3 rings on screen at once) */
+  @keyframes ringFill {
+    from { stroke-dashoffset: var(--ring-c); }
+    to { stroke-dashoffset: var(--ring-offset); }
+  }
+  .ring-progress, .ring-progress-glow {
+    animation: ringFill 1s cubic-bezier(.16,1,.3,1) both;
+  }
 
   /* checkbox completion pop */
   @keyframes checkPop {

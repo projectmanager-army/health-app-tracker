@@ -115,15 +115,29 @@ function fmtKm(km) {
   return `${Math.round(km * 10) / 10} km`;
 }
 
-function ring(size, strokeWidth, pct, color, trackColor = 'var(--surface2)') {
+let ringGradSeq = 0;
+function ring(size, strokeWidth, pct, color, color2, trackColor = 'var(--surface2)') {
   const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
   const offset = c - (c * Math.max(0, Math.min(100, pct))) / 100;
   const cx = size / 2, cy = size / 2;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  const c2 = color2 || color;
+  const gradId = `ringGrad${ringGradSeq++}`;
+  // CSS custom props carry the target dashoffset in; the actual animation
+  // (empty -> pct) is driven by the ringFill keyframe in styles.css so the
+  // ring visibly fills in on every render rather than snapping into place.
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="ring-svg" style="overflow:visible;">
+    <defs>
+      <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${color}"></stop>
+        <stop offset="100%" stop-color="${c2}"></stop>
+      </linearGradient>
+    </defs>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${trackColor}" stroke-width="${strokeWidth}"></circle>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"
-      stroke-dasharray="${c}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"></circle>
+    <circle class="ring-progress-glow" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#${gradId})" stroke-width="${strokeWidth + 3}"
+      stroke-linecap="round" stroke-dasharray="${c}" style="--ring-c:${c};--ring-offset:${offset};" transform="rotate(-90 ${cx} ${cy})"></circle>
+    <circle class="ring-progress" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#${gradId})" stroke-width="${strokeWidth}"
+      stroke-linecap="round" stroke-dasharray="${c}" style="--ring-c:${c};--ring-offset:${offset};" transform="rotate(-90 ${cx} ${cy})"></circle>
   </svg>`;
 }
 
@@ -572,7 +586,7 @@ function renderHome() {
 
     <div class="two-col-grid-even">
       <div class="card ring-card">
-        ${ring(70, 7, (day.waterMl / 2200) * 100, 'var(--phase2)')}
+        ${ring(70, 7, (day.waterMl / 2200) * 100, 'var(--phase2)', 'var(--teal)')}
         <div style="flex:1;">
           <div class="ring-card-title">Water${dayPill()}</div>
           <div class="ring-card-sub">${day.waterMl}ml of 2200ml</div>
@@ -584,7 +598,7 @@ function renderHome() {
         </div>
       </div>
       <div class="card ring-card">
-        ${ring(70, 7, (day.proteinGrams / 110) * 100, 'var(--teal)')}
+        ${ring(70, 7, (day.proteinGrams / 110) * 100, 'var(--teal)', 'var(--phase2)')}
         <div style="flex:1;">
           <div class="ring-card-title">Protein${dayPill()}</div>
           <div class="ring-card-sub">${day.proteinGrams}g of 110g</div>
@@ -720,17 +734,17 @@ function renderOverview() {
 
     <div class="ring-stats-grid">
       <div class="card ring-stat">
-        ${ring(72, 7, report.mobilityPct, 'var(--phase3)')}
+        ${ring(72, 7, report.mobilityPct, 'var(--phase3)', 'var(--coral)')}
         <div class="ring-stat-num">${report.mobilityPct}%</div>
         <div class="ring-stat-label">Mobility adherence</div>
       </div>
       <div class="card ring-stat">
-        ${ring(72, 7, report.suppPct, 'var(--teal)')}
+        ${ring(72, 7, report.suppPct, 'var(--teal)', 'var(--phase2)')}
         <div class="ring-stat-num">${report.suppPct}%</div>
         <div class="ring-stat-label">Supplement adherence</div>
       </div>
       <div class="card ring-stat">
-        ${ring(72, 7, report.checklistPct, 'var(--amber-text)')}
+        ${ring(72, 7, report.checklistPct, 'var(--amber-text)', 'var(--coral)')}
         <div class="ring-stat-num">${report.checklistPct}%</div>
         <div class="ring-stat-label">Daily checklist adherence</div>
       </div>
@@ -920,7 +934,7 @@ function renderSupplements() {
     <div class="page-sub" style="margin-bottom:18px;">Water, protein, and the cruelty-free supplement stack — click any item to see why it's there.</div>
 
     <div class="card supp-hero">
-      ${ring(76, 8, proteinPct, 'var(--teal)')}
+      ${ring(76, 8, proteinPct, 'var(--teal)', 'var(--phase2)')}
       <div style="flex:1;min-width:0;">
         <div class="supp-hero-title">Protein ${isViewingToday() ? 'today' : viewDateLabel()}</div>
         <div class="supp-hero-sub">${day.proteinGrams}g of 110g target — recovery &amp; tendon repair.</div>
@@ -965,7 +979,7 @@ function renderSupplements() {
     </div>
 
     <div class="card supp-hero">
-      ${ring(76, 8, waterPct, 'var(--phase2)')}
+      ${ring(76, 8, waterPct, 'var(--phase2)', 'var(--teal)')}
       <div style="flex:1;min-width:0;">
         <div class="supp-hero-title">Water ${isViewingToday() ? 'today' : viewDateLabel()}</div>
         <div class="supp-hero-sub">${day.waterMl}ml of 2200ml target.</div>
@@ -1092,6 +1106,7 @@ function renderShoes() {
         const pct = Math.min(100, Math.round((sh.km / 500) * 100));
         const warn = sh.km >= 450;
         const ringColor = warn ? 'var(--coral)' : 'var(--teal)';
+        const ringColor2 = warn ? 'var(--phase4)' : 'var(--phase2)';
         const blobColor = i === 0 ? 'var(--teal)' : 'var(--phase2)';
         return `
         <div class="card shoe-card">
@@ -1102,7 +1117,7 @@ function renderShoes() {
           <input type="file" accept="image/*" id="shoe-file-${sh.id}" style="display:none;" data-action="shoe-photo-input" data-id="${sh.id}">
           <div class="shoe-body">
             <div class="shoe-ring">
-              ${ring(88, 7, pct, ringColor)}
+              ${ring(88, 7, pct, ringColor, ringColor2)}
               <div class="shoe-ring-pct">${pct}%</div>
             </div>
             <div style="flex:1;min-width:140px;">
