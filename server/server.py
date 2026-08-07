@@ -369,7 +369,39 @@ COACH_TOOLS = [
             'required': ['date', 'type', 'detail', 'reason'],
         },
     },
+    {
+        'name': 'log_water',
+        'description': "Add water intake in ml to today's total. Only call this when the athlete directly tells you they drank water.",
+        'input_schema': {'type': 'object', 'properties': {'ml': {'type': 'number'}}, 'required': ['ml']},
+    },
+    {
+        'name': 'log_protein',
+        'description': "Add protein in grams to today's total. Only call this when the athlete directly tells you they ate something.",
+        'input_schema': {'type': 'object', 'properties': {'grams': {'type': 'number'}}, 'required': ['grams']},
+    },
+    {
+        'name': 'log_mouth_tape',
+        'description': "Mark tonight's mouth tape as done. Only call when the athlete tells you they did it.",
+        'input_schema': {'type': 'object', 'properties': {}},
+    },
+    {
+        'name': 'log_mobility_item',
+        'description': "Mark a specific mobility item done for today. item_name must match one of the athlete's actual mobility item names from today's status below.",
+        'input_schema': {'type': 'object', 'properties': {'item_name': {'type': 'string'}}, 'required': ['item_name']},
+    },
+    {
+        'name': 'log_supplement',
+        'description': "Mark a specific supplement as taken today. item_name must match one of the athlete's actual supplement names from today's status below.",
+        'input_schema': {'type': 'object', 'properties': {'item_name': {'type': 'string'}}, 'required': ['item_name']},
+    },
+    {
+        'name': 'log_checklist_item',
+        'description': "Mark a specific daily checklist habit done for today. item_name must match one of the athlete's actual checklist item names from today's status below.",
+        'input_schema': {'type': 'object', 'properties': {'item_name': {'type': 'string'}}, 'required': ['item_name']},
+    },
 ]
+
+LOG_TOOL_NAMES = {'log_water', 'log_protein', 'log_mouth_tape', 'log_mobility_item', 'log_supplement', 'log_checklist_item'}
 
 ISO_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
@@ -379,7 +411,11 @@ Race: Honolulu Marathon, December 13, 2026.
 {health_profile_section}{memory_section}
 Non-negotiables baked into this plan (don't casually suggest dropping these): nasal breathing on easy runs, daily achilles/toe-spacer mobility work, midfoot strike focus, heat-adaptation long runs scheduled 10am–2pm before Peak phase, walk breaks allowed on long runs.
 
-You can propose changing a specific day's planned workout with the propose_plan_change tool -- use it when the data genuinely supports a change (low readiness, high recent mileage, missed sessions, soreness they mention, a pattern in "things you've learned", etc.), not reflexively. Calling the tool does NOT change anything by itself -- it surfaces a card in the app that the athlete has to explicitly approve before it takes effect, so there's no risk in proposing when you're fairly confident; they're always the final decision-maker. Only propose changes for today or a day later this week that's in the "Current status" below -- you don't have visibility into future weeks, so don't propose changes there. Never propose changing race day itself. When you do call the tool, you can still write normal reply text alongside it (e.g. explain your reasoning); you don't need to (and shouldn't) also describe the exact new workout in prose since the card already shows it.
+You have two different kinds of tools, with two different trust models:
+
+propose_plan_change is YOUR judgment call, so it's gated: calling it does NOT change anything by itself -- it surfaces a card the athlete has to explicitly approve before it takes effect. Use it when the data genuinely supports a change (low readiness, high recent mileage, missed sessions, soreness they mention, a pattern in "things you've learned"), not reflexively -- there's no risk in proposing when you're fairly confident, since they're always the final decision-maker. Only propose changes for today or a day later this week that's in the "Current status" below -- you don't have visibility into future weeks. Never propose changing race day itself. You can still write normal reply text alongside the call (e.g. explain your reasoning); don't also re-describe the exact new workout in prose since the card already shows it.
+
+log_water, log_protein, log_mouth_tape, log_mobility_item, log_supplement, and log_checklist_item are different: they execute immediately, no approval card, because the athlete is directly telling you something they already did or consumed -- it's the same as them tapping the checkbox themselves. Only call these when they clearly state a real, completed action ("I just drank a glass of water", "log 30g of protein for lunch", "mark my calf raises done", "I did my mobility today" -- for that last one, call log_mobility_item once per item still outstanding). Never call them speculatively, for something planned but not done yet, or to guess at an amount they didn't give you. For log_mobility_item/log_supplement/log_checklist_item, item_name must match one of the athlete's actual item names shown in "Today so far" below -- if nothing matches, ask which item they mean instead of guessing.
 
 Be specific and concise -- a few sentences to a short paragraph is usually enough, not an exhaustive breakdown -- and ask a clarifying question if the data below doesn't cover what you'd need to answer well.
 
@@ -449,6 +485,34 @@ def extract_proposals(content_blocks):
     return proposals
 
 
+def extract_log_actions(content_blocks):
+    """Pulls the direct-logging tool calls (log_water, log_mobility_item,
+    etc.) out of the response content. Unlike proposals these execute
+    immediately client-side, so validate defensively -- a malformed/oversized
+    value here writes straight into the athlete's daily log."""
+    actions = []
+    for block in content_blocks:
+        if block.get('type') != 'tool_use' or block.get('name') not in LOG_TOOL_NAMES:
+            continue
+        name = block['name']
+        args = block.get('input') or {}
+        if name == 'log_water':
+            ml = args.get('ml')
+            if isinstance(ml, (int, float)) and 0 < ml <= 5000:
+                actions.append({'type': name, 'ml': round(ml)})
+        elif name == 'log_protein':
+            g = args.get('grams')
+            if isinstance(g, (int, float)) and 0 < g <= 500:
+                actions.append({'type': name, 'grams': round(g)})
+        elif name == 'log_mouth_tape':
+            actions.append({'type': name})
+        else:  # log_mobility_item / log_supplement / log_checklist_item
+            item_name = str(args.get('item_name', '')).strip()[:120]
+            if item_name:
+                actions.append({'type': name, 'item_name': item_name})
+    return actions
+
+
 def format_coach_context(context):
     if not isinstance(context, dict):
         context = {}
@@ -509,6 +573,18 @@ def format_coach_context(context):
             f"mouth tape {trend.get('mouthTapeDaysHit', '?')}/7 nights."
         )
 
+    today_log = context.get('todayLog')
+    if today_log:
+        lines.append(
+            f"Today so far: {today_log.get('waterMl', 0)}ml water, {today_log.get('proteinGrams', 0)}g protein, "
+            f"mouth tape {'done' if today_log.get('mouthTapeDone') else 'not yet'}."
+        )
+        for label, key in (('Mobility items', 'mobilityItems'), ('Supplements', 'supplementItems'), ('Daily checklist', 'checklistItems')):
+            items = today_log.get(key) or []
+            if items:
+                rendered = ', '.join(f"{it.get('name', '?')} ({'done' if it.get('done') else 'not done'})" for it in items)
+                lines.append(f"{label} (use these exact names with the log_ tools): {rendered}")
+
     return '\n'.join(lines)
 
 
@@ -558,17 +634,22 @@ def coach_reply(config, messages, context):
     text = ''.join(block.get('text', '') for block in content_blocks if block.get('type') == 'text')
     cleaned_text, new_memories = extract_memories(text)
     proposals = extract_proposals(content_blocks)
+    log_actions = extract_log_actions(content_blocks)
     if not cleaned_text and proposals:
         # The model sometimes calls the tool with no accompanying prose --
         # the card speaks for itself, but the chat bubble still needs *some*
         # text so the conversation history (and the UI) has something to show.
         cleaned_text = 'Here’s what I’d suggest — take a look at the card below.'
+    elif not cleaned_text and log_actions:
+        cleaned_text = 'Got it — logged.'
 
     result = {'reply': cleaned_text}
     if new_memories:
         result['memories'] = new_memories
     if proposals:
         result['proposals'] = proposals
+    if log_actions:
+        result['logActions'] = log_actions
     return result
 
 

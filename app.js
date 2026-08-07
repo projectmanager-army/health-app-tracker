@@ -275,6 +275,15 @@ function buildCoachContext() {
       mobilityTotal: state.customMobility.length,
       mouthTapeStreak: mouthTapeStreak(state),
     },
+    // Exact names so the coach can reference real items when logging
+    // something on the athlete's behalf (log_mobility_item etc. match
+    // against these, not free-form guesses).
+    todayLog: {
+      waterMl: day.waterMl, proteinGrams: day.proteinGrams, mouthTapeDone: !!day.mouthTape,
+      mobilityItems: state.customMobility.map((m) => ({ name: m.name, done: !!day.mobility[m.id] })),
+      supplementItems: state.customSupplements.map((s) => ({ name: s.name, done: !!day.supplements[s.id] })),
+      checklistItems: state.customChecklist.map((c) => ({ name: c.label, done: !!day.checklist[c.id] })),
+    },
     last7Days: buildCoachTrends(),
     healthProfile: state.healthProfile ? state.healthProfile.trim() : null,
     coachMemory: (state.coachMemory || []).map((m) => m.text),
@@ -1274,6 +1283,8 @@ async function sendCoachMessage() {
       })) : [];
       state.coachMessages = [...state.coachMessages, { role: 'assistant', content: res.reply, ts: Date.now(), proposals }];
       if (Array.isArray(res.memories) && res.memories.length) addCoachMemories(res.memories);
+      const logged = applyCoachLogActions(res.logActions);
+      if (logged.length) toast(`Logged: ${logged.join(', ')}`);
       persist();
     }
   } catch {
@@ -1297,6 +1308,65 @@ function addCoachMemories(facts) {
     .map((text) => ({ id: 'mem-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), text, ts: Date.now() }));
   if (!additions.length) return;
   state.coachMemory = [...state.coachMemory, ...additions].slice(-COACH_MEMORY_CAP);
+}
+
+// ---------------- coach direct logging ----------------
+// Unlike plan proposals (the coach's own judgment call, gated behind an
+// Apply click), these execute immediately -- the athlete is directly
+// telling the coach something they did or consumed, so it's the same as
+// them clicking the checkbox themselves, not a suggestion to review.
+
+function findItemByName(list, name) {
+  if (!name) return null;
+  const norm = String(name).trim().toLowerCase();
+  if (!norm) return null;
+  return list.find((it) => it.name.toLowerCase() === norm)
+    || list.find((it) => it.name.toLowerCase().includes(norm) || norm.includes(it.name.toLowerCase()))
+    || null;
+}
+
+function applyCoachLogActions(actions) {
+  if (!Array.isArray(actions) || !actions.length) return [];
+  const day = getDay(state, TODAY_ISO);
+  const patch = {};
+  const summary = [];
+
+  for (const a of actions) {
+    if (a.type === 'log_water' && typeof a.ml === 'number' && a.ml > 0) {
+      patch.waterMl = Math.max(0, (patch.waterMl ?? day.waterMl) + a.ml);
+      summary.push(`+${a.ml}ml water`);
+    } else if (a.type === 'log_protein' && typeof a.grams === 'number' && a.grams > 0) {
+      patch.proteinGrams = Math.max(0, (patch.proteinGrams ?? day.proteinGrams) + a.grams);
+      summary.push(`+${a.grams}g protein`);
+    } else if (a.type === 'log_mouth_tape') {
+      patch.mouthTape = true;
+      summary.push('mouth tape');
+    } else if (a.type === 'log_mobility_item') {
+      const item = findItemByName(state.customMobility, a.item_name);
+      if (item) {
+        patch.mobility = { ...day.mobility, ...patch.mobility, [item.id]: true };
+        summary.push(item.name);
+      }
+    } else if (a.type === 'log_supplement') {
+      const item = findItemByName(state.customSupplements, a.item_name);
+      if (item) {
+        patch.supplements = { ...day.supplements, ...patch.supplements, [item.id]: true };
+        summary.push(item.name);
+      }
+    } else if (a.type === 'log_checklist_item') {
+      const item = findItemByName(state.customChecklist.map((c) => ({ id: c.id, name: c.label })), a.item_name);
+      if (item) {
+        patch.checklist = { ...day.checklist, ...patch.checklist, [item.id]: true };
+        summary.push(item.name);
+      }
+    }
+  }
+
+  if (Object.keys(patch).length) {
+    setDay(state, TODAY_ISO, patch);
+    persist();
+  }
+  return summary;
 }
 
 // Finds a proposal by id across all coach messages (they're small in number
