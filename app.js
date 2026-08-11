@@ -2059,9 +2059,19 @@ function checkMidnightRollover() {
 function saveCycleStart() {
   const input = document.getElementById('cycle-start-input');
   if (!input || !input.value) return;
+  const prev = state.cycleStartDate;
+  // Overwriting an already-set date is exactly the failure mode that can
+  // silently reset cycle tracking back to day 1 -- e.g. opening "Update"
+  // just to look, the date widget defaulting to today, and an accidental
+  // Save. First-time sets (prev is null) don't need this, nothing to lose yet.
+  if (prev && prev !== input.value) {
+    const ok = window.confirm(`Change period start date from ${prev} to ${input.value}?`);
+    if (!ok) return;
+  }
   state.cycleStartDate = input.value;
   ui.showCycleDatePicker = false;
   persist(); render();
+  toast('Period start date saved');
 }
 
 // ---------------- backup / restore ----------------
