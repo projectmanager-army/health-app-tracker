@@ -420,7 +420,7 @@ Non-negotiables baked into this plan (don't casually suggest dropping these): na
 
 You have two different kinds of tools, with two different trust models:
 
-propose_plan_change is YOUR judgment call, so it's gated: calling it does NOT change anything by itself -- it surfaces a card the athlete has to explicitly approve before it takes effect. Use it when the data genuinely supports a change (low readiness, high recent mileage, missed sessions, soreness they mention, a pattern in "things you've learned"), not reflexively -- there's no risk in proposing when you're fairly confident, since they're always the final decision-maker. Only propose changes for today or a day later this week that's in the "Current status" below -- you don't have visibility into future weeks. Never propose changing race day itself. You can still write normal reply text alongside the call (e.g. explain your reasoning); don't also re-describe the exact new workout in prose since the card already shows it.
+propose_plan_change is YOUR judgment call, so it's gated: calling it does NOT change anything by itself -- it surfaces a card the athlete has to explicitly approve before it takes effect. Use it when the data genuinely supports a change -- low readiness, high recent mileage, missed sessions, soreness they mention, a pattern in "things you've learned", their current cycle phase and its training guidance (below), or a practical constraint they tell you about (traveling with no gym access, an injury, a schedule conflict) -- not reflexively; there's no risk in proposing when you're fairly confident, since they're always the final decision-maker. If a request spans several days (e.g. "no gym until next Thursday"), call the tool once per affected day in the same turn rather than only handling the first one. Only propose changes for a day shown in "Current status" below (today through the end of next week) -- you don't have visibility beyond that. Never propose changing race day itself. You can still write normal reply text alongside the call (e.g. explain your reasoning); don't also re-describe the exact new workout in prose since the card already shows it.
 
 log_water, log_protein, log_mouth_tape, log_mobility_item, log_supplement, and log_checklist_item are different: they execute immediately, no approval card, because the athlete is directly telling you something they already did or consumed -- it's the same as them tapping the checkbox themselves. Only call these when they clearly state a real, completed action ("I just drank a glass of water", "log 30g of protein for lunch", "mark my calf raises done", "I did my mobility today" -- for that last one, call log_mobility_item once per item still outstanding). Never call them speculatively, for something planned but not done yet, or to guess at an amount they didn't give you. For log_mobility_item/log_supplement/log_checklist_item, item_name must match one of the athlete's actual item names shown in "Today so far" below -- if nothing matches, ask which item they mean instead of guessing.
 
@@ -485,7 +485,10 @@ def extract_proposals(content_blocks):
         date = str(args.get('date', '')).strip()
         workout_type = str(args.get('type', '')).strip()[:80]
         detail = str(args.get('detail', '')).strip()[:500]
-        reason = str(args.get('reason', '')).strip()[:300]
+        # reason is schema-required, but don't drop an otherwise-valid
+        # proposal over a model skipping it -- fall back rather than
+        # silently losing the card the reply text may already reference.
+        reason = str(args.get('reason', '')).strip()[:300] or 'Suggested based on your current training data.'
         if not ISO_DATE_RE.match(date) or not workout_type or not detail:
             continue
         proposals.append({'date': date, 'type': workout_type, 'detail': detail, 'reason': reason})
@@ -539,6 +542,12 @@ def format_coach_context(context):
         for d in rest:
             lines.append(f"  - {d.get('day', '')}: {d.get('type', '')} — {d.get('detail', '')}")
 
+    next_week = context.get('nextWeekPlan') or []
+    if next_week:
+        lines.append("Next week's plan:")
+        for d in next_week:
+            lines.append(f"  - {d.get('day', '')}: {d.get('type', '')} — {d.get('detail', '')}")
+
     lines.append(f"km logged this week (Strava-synced runs only): {context.get('weeklyKmSoFar', 0)}")
 
     runs = context.get('recentStravaRuns') or []
@@ -562,6 +571,8 @@ def format_coach_context(context):
     cycle = context.get('cycle')
     if cycle:
         lines.append(f"Cycle: day {cycle.get('day', '?')} of 28 ({cycle.get('phase', '?')} phase)")
+        if cycle.get('workoutGuidance'):
+            lines.append(f"  Training guidance for this phase: {cycle['workoutGuidance']}")
 
     adherence = context.get('adherence') or {}
     if adherence:

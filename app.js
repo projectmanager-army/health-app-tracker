@@ -250,10 +250,15 @@ function buildCoachTrends() {
 // built fresh each send so the model always reasons from current data.
 function buildCoachContext() {
   const wk = currentWeek();
-  const { dayIdx } = currentWeekInfo();
+  const { weekIdx, dayIdx } = currentWeekInfo();
   const rawToday = wk.days[dayIdx];
   const todayEntry = getPlanDay(rawToday);
   const restOfWeek = wk.days.slice(dayIdx).filter((d) => d !== rawToday).map((d) => getPlanDay(d));
+  // A second week of visibility so near-term-but-cross-week asks (e.g. "no
+  // gym access until next Thursday") can actually be proposed in one go,
+  // not just whatever happens to be left in the current week.
+  const nextWk = WEEKS[weekIdx + 1];
+  const nextWeekPlan = nextWk ? nextWk.days.map((d) => getPlanDay(d)) : [];
 
   const cutoffIso = isoDate(addDays(new Date(), -14));
   const recentStravaRuns = state.runLog
@@ -270,6 +275,7 @@ function buildCoachContext() {
     : null;
 
   const cycleDayNum = currentCycleDay();
+  const cyclePhase = state.cycleStartDate ? cyclePhaseForDay(cycleDayNum) : null;
   const day = getDay(state, TODAY_ISO);
   const mobilityDone = state.customMobility.filter((m) => day.mobility[m.id]).length;
 
@@ -280,10 +286,11 @@ function buildCoachContext() {
     isDownWeek: wk.isDown,
     todaysWorkout: todayEntry ? { day: todayEntry.label, type: todayEntry.type, detail: todayEntry.detail } : null,
     restOfWeek: restOfWeek.map((d) => ({ day: d.label, type: d.type, detail: d.detail })),
+    nextWeekPlan: nextWeekPlan.map((d) => ({ day: d.label, type: d.type, detail: d.detail })),
     weeklyKmSoFar: Math.round(weeklyKm() * 10) / 10,
     recentStravaRuns,
     oura,
-    cycle: state.cycleStartDate ? { day: cycleDayNum, phase: cyclePhaseForDay(cycleDayNum).name } : null,
+    cycle: cyclePhase ? { day: cycleDayNum, phase: cyclePhase.label, workoutGuidance: cyclePhase.workouts } : null,
     adherence: {
       mobilityDone,
       mobilityTotal: state.customMobility.length,
