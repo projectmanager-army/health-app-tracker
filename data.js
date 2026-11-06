@@ -175,7 +175,9 @@ export function buildWeeks() {
     const phase = PHASES[phaseIdx];
     const weekStart = addDays(PLAN_START, (w - 1) * 7);
     const weekEnd = addDays(weekStart, 6);
-    const dateLabel = `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()}–${weekEnd.getDate()}`;
+    const dateLabel = weekStart.getMonth() === weekEnd.getMonth()
+      ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()}–${weekEnd.getDate()}`
+      : `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} – ${MONTHS[weekEnd.getMonth()]} ${weekEnd.getDate()}`;
     const longRun = LONG_RUN[w] ?? null;
     const block = FINAL_BLOCK[w];
     const days = (block ? block.days.map(([type, detail, code]) => ({ type, detail, code })) : TEMPLATES[phaseIdx]).map((t, i) => {

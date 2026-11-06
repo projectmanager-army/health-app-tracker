@@ -781,62 +781,46 @@ function renderOverview() {
 // ---------------- plan ----------------
 
 function renderPlan() {
-  const { weekIdx, dayIdx } = currentWeekInfo();
-  const wk = currentWeek();
+  // Only the hand-built block (Nov 2 - race day), and only weeks that aren't
+  // fully in the past yet -- the earlier 27-week template history is hidden.
+  const weeks = WEEKS.filter((w) => w.note && w.days[6].iso >= TODAY_ISO);
 
-  const thisWeekDays = wk.days.map((rawD, i) => {
-    const d = getPlanDay(rawD);
-    const isToday = i === dayIdx;
-    const short = d.type.length > 20 ? d.type.slice(0, 18) + '…' : d.type;
-    return { d, isToday, short };
-  });
+  const weekHtml = weeks.map((w) => `
+    <div class="plan-week">
+      <div class="plan-week-head">
+        <div>
+          <div class="plan-week-title">${w.week === 27 ? 'Race week' : `Week ${w.week - 21}`} · ${w.dateLabel}</div>
+          <div class="plan-week-note">${esc(w.note)}</div>
+        </div>
+        ${w.weeklyKm ? `<div class="plan-week-km">~${w.weeklyKm}km</div>` : ''}
+      </div>
+      ${w.days.map((rawD) => {
+        const d = getPlanDay(rawD);
+        const isToday = d.iso === TODAY_ISO;
+        const isPast = d.iso < TODAY_ISO;
+        return `
+        <div class="plan-day-row ${isToday ? 'today' : ''} ${isPast ? 'past' : ''}" data-action="open-day" data-week="${w.week}" data-day="${d.day}">
+          <div class="plan-day-date">${d.label.split(' ')[0]}<span>${d.label.split(' ').slice(1).join(' ')}</span></div>
+          <div class="plan-day-icon">${gradIcon(iconFor(d.type), isToday ? '#20221E' : w.phaseColor, isToday ? 'rgba(32,34,30,0.5)' : 'var(--coral)', 32)}</div>
+          <div class="plan-day-body">
+            <div class="plan-day-type">${esc(d.type)}${d.overridden ? ' <span class="override-pill">Changed by coach</span>' : ''}</div>
+            <div class="plan-day-detail">${esc(d.detail)}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
 
   return `
   <div>
-    <div class="plan-head">
-      <div class="page-title">27-week plan</div>
-      <div class="phase-legend">
-        ${PHASES.map((p) => `<div class="phase-legend-item"><span class="phase-legend-dot" style="background:${p.color};"></span>${p.name}</div>`).join('')}
-      </div>
-    </div>
-    <div class="plan-sub">Click any day for the full session detail.</div>
-
-    <div class="this-week-title">This week</div>
-    <div class="this-week-grid">
-      ${thisWeekDays.map(({ d, isToday, short }) => `
-        <div class="this-week-day ${isToday ? 'today' : ''}" data-action="open-day" data-week="${wk.week}" data-day="${d.day}">
-          ${d.overridden ? `<div class="this-week-day-override-dot" title="Changed by coach"></div>` : ''}
-          <div class="this-week-day-name">${d.label.split(' ')[0]}</div>
-          <div class="this-week-day-num">${d.label.split(' ').slice(-1)[0]}</div>
-          <div class="this-week-day-icon-wrap">
-            ${gradIcon(iconFor(d.type), isToday ? '#20221E' : wk.phaseColor, isToday ? 'rgba(32,34,30,0.5)' : 'var(--coral)', 36)}
-          </div>
-          <div class="this-week-day-short">${esc(short)}</div>
-        </div>`).join('')}
-    </div>
+    <div class="page-title" style="margin-bottom:4px;">Race plan</div>
+    <div class="page-sub" style="margin-bottom:18px;">Honolulu Marathon · Sun Dec 13 · 5:00am · flight Wed Dec 2. Tap a day for the full detail.</div>
 
     <div class="card plan-notes">
-      <div class="plan-notes-title">Key notes · Nov 2 – Dec 13</div>
+      <div class="plan-notes-title">Key notes</div>
       ${PLAN_KEY_NOTES.map(([title, body]) => `<div class="plan-note"><strong>${esc(title)}.</strong> ${esc(body)}</div>`).join('')}
     </div>
 
-    ${WEEKS.map((w) => `
-      <div class="week-row">
-        <div class="week-row-label">Week ${w.week}<div class="week-row-date">${w.dateLabel}</div>${w.note ? `<div class="week-row-note">${esc(w.note)}${w.weeklyKm ? ` · ~${w.weeklyKm}km` : ''}</div>` : ''}</div>
-        <div class="week-row-days">
-          ${w.days.map((rawD) => {
-            const d = getPlanDay(rawD);
-            const isToday = w.week === weekIdx + 1 && d.day === dayIdx;
-            const bg = isToday ? w.phaseColor : w.phaseSoft;
-            const fg = isToday ? '#fff' : w.phaseColor;
-            return `<div class="week-day-chip" style="background:${bg};color:${fg};" data-action="open-day" data-week="${w.week}" data-day="${d.day}">
-              <div class="week-day-chip-label">${d.label.split(' ')[0]}</div>
-              <div class="week-day-chip-code">${d.code}</div>
-            </div>`;
-          }).join('')}
-        </div>
-        ${w.isDown ? `<span class="down-week-badge">down week</span>` : ''}
-      </div>`).join('')}
+    ${weekHtml || '<div class="page-sub">The race plan is complete — nothing left to show.</div>'}
   </div>`;
 }
 
