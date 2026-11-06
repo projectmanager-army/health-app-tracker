@@ -83,16 +83,90 @@ export const TEMPLATES = [
   ],
 ];
 
-export const LONG_RUN = { 1: 6, 2: 7, 3: 8, 4: 9, 5: 10, 6: 8, 7: 12, 8: 14, 9: 16, 10: 13, 11: 18, 12: 20, 13: 16, 14: 22, 15: 24, 16: 20, 17: 26, 18: 28, 19: 22, 20: 30, 21: 32, 22: 35, 23: 28, 24: 20, 25: 14, 26: 8 };
+export const LONG_RUN = { 1: 6, 2: 7, 3: 8, 4: 9, 5: 10, 6: 8, 7: 12, 8: 14, 9: 16, 10: 13, 11: 18, 12: 20, 13: 16, 14: 22, 15: 24, 16: 20, 17: 26, 18: 28, 19: 22, 20: 30, 21: 32, 22: 27, 23: 22, 24: 30, 25: 20, 26: 10 };
 export const DOWN_WEEKS = new Set([6, 10, 13, 16, 19, 23]);
 
 export function phaseIdxForWeek(w) {
   if (w <= 6) return 0;
   if (w <= 13) return 1;
   if (w <= 19) return 2;
-  if (w <= 23) return 3;
+  if (w <= 24) return 3; // through the Nov 22 30km peak
   return 4;
 }
+
+// Hand-built plan for Nov 2 – Dec 13, 2026 (weeks 22–27), from
+// Honolulu_Marathon_Plan_Nov2-Dec13.docx. It replaces the phase-template
+// output for these weeks entirely: each day is [type, detail, code], Mon..Sun.
+// The weekly pattern is Mon yoga, Tue/Thu Zone 2 run, Wed heavy legs + swim,
+// Fri run + upper body, Sat core/mobility/feet, Sun yoga + long run.
+const FINAL_BLOCK = {
+  22: { note: 'Shoe test long run · 27km', km: 51, days: [
+    ['Yoga · Recovery', '45 min · hips, calves, feet · roll arches', 'Y'],
+    ['Run · 8km', 'Zone 2 · hip activation first · 880 shoes', 'R'],
+    ['Heavy Legs + Swim', 'Full hip protocol · 30 min easy pool', 'H'],
+    ['Run · 8km', 'Zone 2 · nasal breathing · cadence 168+', 'R'],
+    ['Run 8km + Upper Body', 'Face pulls, band external rotation, Y-T-W, rows, serratus work', 'U'],
+    ['Core + Mobility + Feet', 'Dead bugs, 90/90 breathing, thread the needle, short foot, toe work', 'C'],
+    ['Yoga + Long Run · 27km', 'Wear the 880, not the 860 · gel every 30–35 min from km 7 · 6–7 gels · carry water', 'L'],
+  ] },
+  23: { note: 'Step-back week · let feet and body absorb', km: 44, days: [
+    ['Yoga · Recovery', 'Side body and rib work · feet', 'Y'],
+    ['Run · 8km', 'Zone 2 · easy', 'R'],
+    ['Heavy Legs + Swim', 'Full protocol · easy pool', 'H'],
+    ['Run · 8km', 'Zone 2 · cadence focus', 'R'],
+    ['Run 6km + Upper Body', 'Same shoulder work · keep it smooth', 'U'],
+    ['Core + Mobility + Feet', '30 min', 'C'],
+    ['Yoga + Long Run · 22km', 'Race shoe decision made by end of today · practice full fueling', 'L'],
+  ] },
+  24: { note: 'Peak week · 30km dress rehearsal', km: 52, days: [
+    ['Yoga · Recovery', 'Hip openers · 45 min', 'Y'],
+    ['Run · 8km', 'Zone 2', 'R'],
+    ['Heavy Legs + Swim', 'Cut volume about 20% · easy pool', 'H'],
+    ['Run · 8km', 'Easy', 'R'],
+    ['Run 6km + Upper Body', 'Light · no new movements', 'U'],
+    ['Core + Mobility + Feet', 'Gentle · long run prep', 'C'],
+    ['Yoga + Long Run · 30km', 'Race shoes, race gels, race breakfast · 6–7 gels · soft flasks · your biggest day', 'L'],
+  ] },
+  25: { note: 'Taper begins · volume drops', km: 39, days: [
+    ['Yoga or Full Rest', 'Post 30km · restorative', 'Y'],
+    ['Run · 8km', 'Zone 2 · shakeout feel', 'R'],
+    ['Leg Activation + Swim', 'Clamshells, TKEs, bridges · last legs session · 20 min', 'H'],
+    ['Run · 6km', 'Easy', 'R'],
+    ['Run 5km + Upper Body', 'Light · last upper session', 'U'],
+    ['Core + Mobility + Feet', '20 min', 'C'],
+    ['Yoga + Long Run · 20km', 'Easy · last real long run · practice race fueling', 'L'],
+  ] },
+  26: { note: 'Fly to Honolulu · start heat adaptation', km: 19, days: [
+    ['Yoga · Easy', '30 min · start packing', 'Y'],
+    ['Run · 5km', 'Easy · pack race kit, gels, salt, shoes in carry-on', 'R'],
+    ['Flight to Honolulu', 'Hydrate · compression socks · walk every hour', 'F'],
+    ['Run · 4km', 'First Honolulu run · note how humidity lifts your HR', 'R'],
+    ['Yoga or Easy Ocean Swim', 'No intensity', 'Y'],
+    ['Core + Mobility + Feet', '15–20 min · gentle', 'C'],
+    ['Run · 10km', 'Start at 5am to rehearse race conditions · Zone 2 · full fueling and drinking practice', 'R'],
+  ] },
+  27: { note: 'Rest, carbs, sleep', km: null, days: [
+    ['Yoga · Easy', 'Hips, calves, feet', 'Y'],
+    ['Run · 5km', 'Easy Zone 2 · no strides, no pace work', 'R'],
+    ['Easy Swim or Rest', 'Ocean or pool · 20 min', 'X'],
+    ['Run · 3km', 'Shakeout in race kit', 'R'],
+    ['Rest + Carb Load', 'Expo · feet up · sodium and fluids steady all day', 'X'],
+    ['Light Mobility + Carb Load', '15 min · lay out gear · early dinner · bed by 8pm · alarm about 2:30am', 'C'],
+    ['🌺 RACE DAY', 'Honolulu Marathon · 5am · Zone 2 first 15km · gel every 30–35 min · drink at every aid station · water on head from km 15', '🌺'],
+  ] },
+};
+
+// Shown on the Plan tab alongside the final-block weeks.
+export const PLAN_KEY_NOTES = [
+  ['Heart rate zones (max HR 190)', 'Z1 under 114 · Z2 114–133 · Z3 133–152 · Z4 152–171 · Z5 171–190. Run easy days by heart rate, not pace, and set a watch alert at 133 bpm.'],
+  ['Fueling', 'About 60g carbs per hour. Gel every 30–35 minutes from km 7, 6–7 gels on long runs, about 500ml fluid per hour with electrolytes. Carry soft flasks so you are not relying on shops.'],
+  ['Feet', 'Short foot, toe yoga, single-leg calf raises, towel scrunches, and gentle passive mobility for the right big toe (never into pain). Test the 880 on Nov 8, decide the race shoe by Nov 15, and see a podiatrist or sports physio before Nov 22.'],
+  ['Ribs and shoulder', 'Saturday core: 90/90 breathing, thread the needle, side-lying rib stretch, dead bugs. Friday upper body: face pulls, band external rotation, Y-T-W, single-arm rows, serratus work.'],
+  ['Right side first', 'If the right knee, foot or hip flares during a long run, shorten the run and add rest. Protecting it protects Honolulu.'],
+  ['Honolulu heat', 'Expect heart rate 10–15 bpm higher than Toronto at the same effort. Stay near Zone 2 for the first 15km, then go by feel. Drink at every aid station and pour water on your head from km 15.'],
+  ['Log every long run', 'Cycle day, shoe, gels, foot pain, and how it felt. The patterns will show up within a few weeks.'],
+  ['Taper', 'Your legs will feel flat in weeks 4 and 5. Do not add runs. The fitness is already banked.'],
+];
 
 export function buildWeeks() {
   const weeks = [];
@@ -103,21 +177,17 @@ export function buildWeeks() {
     const weekEnd = addDays(weekStart, 6);
     const dateLabel = `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()}–${weekEnd.getDate()}`;
     const longRun = LONG_RUN[w] ?? null;
-    const days = TEMPLATES[phaseIdx].map((t, i) => {
+    const block = FINAL_BLOCK[w];
+    const days = (block ? block.days.map(([type, detail, code]) => ({ type, detail, code })) : TEMPLATES[phaseIdx]).map((t, i) => {
       const d = addDays(weekStart, i);
-      let type = t.type, detail = t.detail, code = t.code;
-      if (i === 5 && longRun) detail = `${longRun}km · ${detail}`;
-      if (w === 27) {
-        // Week 27 runs Mon Dec 7 - Sun Dec 13, 2026 -- race day (Dec 13) is a
-        // real Sunday, landing correctly at index 6.
-        if (i === 4) { type = 'Easy jog + mobility'; detail = '10 min easy jog + mobility. Lay out all gear today.'; code = 'J'; }
-        else if (i === 5) { type = 'Full rest'; detail = 'Full rest. Short 5 min walk only. High-carb dinner, early bed.'; code = 'X'; }
-        else if (i === 6) { type = '🌺 RACE DAY'; detail = 'Honolulu Marathon. Start ~5am. Pre-race: electrolytes + banana. Go out slower than you think.'; code = '🌺'; }
-      }
+      let { type, detail, code } = t;
+      // Race day (Dec 13) is a real Sunday, landing at index 6 of week 27.
+      if (!block && i === 5 && longRun) detail = `${longRun}km · ${detail}`;
       return { label: `${DAY_LABELS[i]} ${MONTHS[d.getMonth()]} ${d.getDate()}`, day: i, type, detail, code, dateObj: d, iso: isoDate(d) };
     });
     weeks.push({
       week: w, phaseIdx, phaseName: phase.name, phaseColor: phase.color, phaseSoft: phase.soft,
+      note: block ? block.note : null, weeklyKm: block ? block.km : null,
       dateLabel, isDown: DOWN_WEEKS.has(w), days,
       barPct: longRun ? Math.max(6, Math.round((longRun / 35) * 100)) : (w === 27 ? 100 : 6),
     });

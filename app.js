@@ -1,7 +1,7 @@
 import {
   PHASES, buildWeeks, currentWeekInfo, isoDate, MONTHS,
   PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
-  iconFor, RACE_DATE, addDays, daysBetween,
+  iconFor, RACE_DATE, addDays, daysBetween, PLAN_KEY_NOTES,
 } from './data.js';
 import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak, mergeWithDefaults } from './storage.js';
 
@@ -434,9 +434,9 @@ function renderSidebar() {
       ${todayDay.overridden ? `<div class="override-note">Was: ${esc(todayDay.originalType)} — ${esc(todayDay.overrideReason || 'coach suggestion')} <button class="revert-override-btn" data-action="revert-plan-override" data-date="${todayDay.iso}">Revert</button></div>` : ''}
       ${readiness < 70 ? `<div class="recovery-note"><i class="ti ti-battery-2"></i>Readiness is low — consider an easier version.</div>` : ''}
       <div class="today-coaching">
-        <div class="today-coaching-row"><i class="ti ti-map-pin"></i><div>${wk.phaseIdx >= 3 ? 'Try to run 10am–2pm today to simulate Honolulu heat.' : 'Flat, familiar route — save new terrain for down weeks.'}</div></div>
+        <div class="today-coaching-row"><i class="ti ti-map-pin"></i><div>${wk.note ? (wk.week >= 26 ? 'Honolulu heat: expect heart rate 10–15 bpm higher at the same effort. Stay near Zone 2.' : 'Run easy days by heart rate, not pace — watch alert at 133 bpm.') : 'Flat, familiar route — save new terrain for down weeks.'}</div></div>
         <div class="today-coaching-row"><i class="ti ti-gauge"></i><div>${todayDay.type.includes('Long') ? 'Nasal breathing only, conversational pace throughout.' : (todayDay.type.includes('Tempo') || todayDay.type.includes('Race-Pace')) ? 'Warm up easy, settle into effort only once breathing is smooth.' : 'Keep it easy — this is aerobic base, not a workout.'}</div></div>
-        <div class="today-coaching-row"><i class="ti ti-shoe"></i><div>ASICS Gel-Nimbus for anything over 90 min; NB Fresh Foam otherwise.</div></div>
+        ${wk.note ? '' : `<div class="today-coaching-row"><i class="ti ti-shoe"></i><div>ASICS Gel-Nimbus for anything over 90 min; NB Fresh Foam otherwise.</div></div>`}
       </div>
     </div>
 
@@ -815,9 +815,14 @@ function renderPlan() {
         </div>`).join('')}
     </div>
 
+    <div class="card plan-notes">
+      <div class="plan-notes-title">Key notes · Nov 2 – Dec 13</div>
+      ${PLAN_KEY_NOTES.map(([title, body]) => `<div class="plan-note"><strong>${esc(title)}.</strong> ${esc(body)}</div>`).join('')}
+    </div>
+
     ${WEEKS.map((w) => `
       <div class="week-row">
-        <div class="week-row-label">Week ${w.week}<div class="week-row-date">${w.dateLabel}</div></div>
+        <div class="week-row-label">Week ${w.week}<div class="week-row-date">${w.dateLabel}</div>${w.note ? `<div class="week-row-note">${esc(w.note)}${w.weeklyKm ? ` · ~${w.weeklyKm}km` : ''}</div>` : ''}</div>
         <div class="week-row-days">
           ${w.days.map((rawD) => {
             const d = getPlanDay(rawD);
