@@ -240,12 +240,28 @@ export const PRERACE_LABELS = {
   alarm: 'Alarm set — early wake for 5am start',
 };
 
+// Equipment tab columns. The first one is the marathon packing list (it
+// replaced the old "Shoes & Socks" column).
+export const PACKING_GROUP = 'Marathon packing list';
+export const EQUIPMENT_GROUPS = [PACKING_GROUP, 'Recovery', 'Accessories'];
+
 // Starting set for the user-editable equipment list (state.customEquipment in
 // storage.js), from the training spec's Gear & Equipment section. Just seed
 // data -- the user can add, edit, and delete from here on. Checked state
 // persists separately in state.equipmentChecklist.
 export const EQUIPMENT_DEFAULTS = [
-  { id: 'injinji-socks', group: 'Shoes & Socks', name: 'Injinji toe socks', note: 'Separates toes, prevents bunion blisters, allows natural foot function.' },
+  // Marathon packing list (Honolulu, flight Wed Dec 2) -- the first column on the Equipment tab.
+  { id: 'pack-race-shoes', group: PACKING_GROUP, name: 'Race shoes (carry-on)', note: 'Decide by Nov 15. Never pack them in checked luggage.' },
+  { id: 'pack-race-outfit', group: PACKING_GROUP, name: 'Race outfit', note: 'Exactly what you wore on the Nov 22 rehearsal. No new gear on race day.' },
+  { id: 'injinji-socks', group: PACKING_GROUP, name: 'Injinji toe socks', note: 'Separates toes, prevents bunion blisters, allows natural foot function.' },
+  { id: 'pack-gels', group: PACKING_GROUP, name: 'Gels (8–10)', note: 'About 60g carbs per hour, a gel every 30–35 min from km 7. Carry-on.' },
+  { id: 'pack-electrolytes', group: PACKING_GROUP, name: 'Salt / electrolytes', note: 'Sodium for the Honolulu heat and humidity.' },
+  { id: 'pack-flasks', group: PACKING_GROUP, name: 'Soft flasks', note: 'So you are not relying on shops or aid stations alone.' },
+  { id: 'pack-sun', group: PACKING_GROUP, name: 'Sunscreen + sunglasses', note: 'Starts at 5am, finishes in full sun.' },
+  { id: 'pack-watch', group: PACKING_GROUP, name: 'Watch + charger', note: 'Heart rate alert at 133 bpm.' },
+  { id: 'pack-bib-pins', group: PACKING_GROUP, name: 'Safety pins / bib belt', note: 'Bib pickup at the expo (Fri Dec 11).' },
+  { id: 'pack-id', group: PACKING_GROUP, name: 'Passport + race confirmation', note: 'Needed for the flight and the expo.' },
+  { id: 'pack-breakfast', group: PACKING_GROUP, name: 'Race-morning breakfast + banana', note: 'Pack what you rehearsed on Nov 22.' },
   { id: 'slant-board', group: 'Recovery', name: 'Slant board (calf raise step)', note: 'Eccentric calf raises — non-negotiable daily achilles protocol.' },
   { id: 'lacrosse-ball', group: 'Recovery', name: 'Lacrosse ball (natural rubber)', note: 'Daily foot rolling, hip and glute release.' },
   { id: 'foam-roller', group: 'Recovery', name: 'Foam roller (full length)', note: 'Thoracic spine before runs, IT band, calf, hip flexor.' },

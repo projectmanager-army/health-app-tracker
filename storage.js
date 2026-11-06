@@ -1,5 +1,5 @@
 // Persistence layer — localStorage backed, real data (no fake/demo numbers).
-import { isoDate, addDays, MOBILITY_DEFAULTS, SUPPLEMENT_DEFAULTS, EQUIPMENT_DEFAULTS } from './data.js';
+import { isoDate, addDays, MOBILITY_DEFAULTS, SUPPLEMENT_DEFAULTS, EQUIPMENT_DEFAULTS, PACKING_GROUP } from './data.js';
 
 const KEY = 'honolulu-tracker-v1';
 
@@ -13,13 +13,16 @@ function defaultState() {
     cycleStartDate: null, // iso date of day 1 of last period; null until user sets it
     selectedCyclePhaseId: null,
     shoes: [
-      { id: 'nb', name: 'NB Fresh Foam', sub: 'Primary — wide, Weeks 1–8', km: 0, photo: null },
-      { id: 'asics', name: 'ASICS Gel-Nimbus 27 Wide (2E)', sub: 'Rotation / race day', km: 0, photo: null },
+      { id: 'nb1080', name: 'New Balance 1080 Fresh Foam', sub: '1080 · max cushion', km: 0, photo: null },
+      { id: 'nb880', name: 'New Balance 880 Fresh Foam', sub: '880 · daily trainer — long-run test Nov 8', km: 0, photo: null },
+      { id: 'nb860', name: 'New Balance 860 Stability Fresh Foam', sub: '860 · stability', km: 0, photo: null },
     ],
+    shoesV2: true, // set once the shoe list has been migrated to the current three
     runLog: [], // {date, km, shoeId}
     prerace: { gear: false, electrolytes: false, banana: false, alarm: false },
     equipmentChecklist: {}, // itemId -> bool, persistent (not daily-reset)
     customEquipment: EQUIPMENT_DEFAULTS.map((e) => ({ ...e })),
+    packingV1: true, // set once the packing list column has replaced "Shoes & Socks"
     customChecklist: [
       { id: 'mouthtape', label: 'Mouth tape', icon: 'ti ti-band-aid', tint: 'var(--teal)', tintSoft: 'var(--teal-soft)' },
       { id: 'stretch', label: 'Stretch / mobility', icon: 'ti ti-stretching', tint: 'var(--phase3)', tintSoft: 'rgba(122,63,91,0.14)' },
@@ -46,12 +49,36 @@ function emptyDay() {
   };
 }
 
+// One-time upgrades for data saved before a change shipped. Runs on both
+// localStorage loads and backup restores, and never throws away user data:
+// the old shoe list is kept under retiredShoes, and any custom items in the
+// old "Shoes & Socks" column move into the packing list with their checked
+// state (that's keyed by item id, so it carries over untouched).
+function migrate(parsed) {
+  const d = defaultState();
+  const out = { ...parsed };
+  if (!out.shoesV2) {
+    if (Array.isArray(out.shoes) && out.shoes.length) out.retiredShoes = out.shoes;
+    out.shoes = d.shoes;
+    out.shoesV2 = true;
+  }
+  if (!out.packingV1) {
+    const items = (Array.isArray(out.customEquipment) ? out.customEquipment : d.customEquipment)
+      .map((it) => (it.group === 'Shoes & Socks' ? { ...it, group: PACKING_GROUP } : it));
+    const have = new Set(items.map((it) => it.id));
+    const added = d.customEquipment.filter((it) => it.group === PACKING_GROUP && !have.has(it.id));
+    out.customEquipment = [...items, ...added];
+    out.packingV1 = true;
+  }
+  return out;
+}
+
 export function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    return { ...defaultState(), ...migrate(parsed) };
   } catch {
     return defaultState();
   }
@@ -61,7 +88,7 @@ export function load() {
 // than localStorage -- so an older backup missing newer fields (added after
 // the backup was taken) still loads with sane defaults instead of breaking.
 export function mergeWithDefaults(parsed) {
-  return { ...defaultState(), ...parsed };
+  return { ...defaultState(), ...migrate(parsed) };
 }
 
 export function save(state) {

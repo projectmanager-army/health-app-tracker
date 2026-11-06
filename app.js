@@ -1,7 +1,7 @@
 import {
   PHASES, buildWeeks, currentWeekInfo, isoDate, MONTHS,
   PRERACE_LABELS, CYCLE_DATA, cyclePhaseForDay,
-  iconFor, RACE_DATE, addDays, daysBetween, PLAN_KEY_NOTES,
+  iconFor, RACE_DATE, addDays, daysBetween, PLAN_KEY_NOTES, EQUIPMENT_GROUPS,
 } from './data.js';
 import { load, save, getDay, setDay, today, mobilityStreak, mouthTapeStreak, mergeWithDefaults } from './storage.js';
 
@@ -1089,7 +1089,7 @@ function renderCycle() {
 // ---------------- shoes ----------------
 
 function renderShoes() {
-  const groups = ['Shoes & Socks', 'Recovery', 'Accessories'];
+  const groups = EQUIPMENT_GROUPS;
 
   return `
   <div>
@@ -1138,12 +1138,13 @@ function renderShoes() {
       ${groups.map((group) => {
         const groupItems = state.customEquipment.filter((it) => it.group === group);
         return `
-        <div>
-          <div class="supp-col-label" style="margin-bottom:8px;">${group}</div>
+        <div class="equipment-col" data-group="${esc(group)}">
+          <div class="supp-col-label" style="margin-bottom:8px;">${esc(group)}</div>
           ${groupItems.map((it) => {
             const done = !!state.equipmentChecklist[it.id];
             return `
-            <div class="card equipment-row">
+            <div class="card equipment-row" draggable="true" data-equip-id="${it.id}">
+              <i class="ti ti-grip-vertical equipment-grip" title="Drag to reorder or move"></i>
               ${checkBtn({ done, small: true, action: 'toggle-equipment', id: it.id })}
               <div class="equipment-row-body" data-action="edit-equipment" data-id="${it.id}">
                 <div class="equipment-row-name">${esc(it.name)}</div>
@@ -1541,7 +1542,7 @@ function renderModals() {
     const item = isNew
       ? { id: null, name: '', note: '', group: ui.editingEquipmentGroup || 'Recovery' }
       : (state.customEquipment.find((it) => it.id === ui.editingEquipmentId) || { id: null, name: '', note: '', group: 'Recovery' });
-    const groupOptions = ['Shoes & Socks', 'Recovery', 'Accessories'];
+    const groupOptions = EQUIPMENT_GROUPS;
     html += `
     <div class="modal-overlay" data-action="close-equipment-edit">
       <div class="modal" data-action="stop">
@@ -2111,6 +2112,89 @@ function importBackupFile(file) {
   reader.onerror = () => toast('Could not read that file');
   reader.readAsText(file);
 }
+
+// ---------------- equipment drag & drop ----------------
+// Native HTML5 drag and drop on the equipment rows: drop on a row to place the
+// item before/after it, or on empty space in a column to append it there. The
+// dragged state lives outside render() on purpose -- the whole DOM is rebuilt
+// on every render, so only the final drop touches state.
+let dragEquipId = null;
+
+function clearDropMarks() {
+  document.querySelectorAll('.drop-target, .drop-before, .drop-after').forEach((el) => {
+    el.classList.remove('drop-target', 'drop-before', 'drop-after');
+  });
+}
+function endEquipDrag() {
+  dragEquipId = null;
+  clearDropMarks();
+  document.querySelectorAll('.equipment-row.dragging').forEach((el) => el.classList.remove('dragging'));
+}
+
+function moveEquipmentItem(id, group, beforeId) {
+  const item = state.customEquipment.find((it) => it.id === id);
+  if (!item) return;
+  const rest = state.customEquipment.filter((it) => it.id !== id);
+  let idx = beforeId && beforeId !== id ? rest.findIndex((it) => it.id === beforeId) : -1;
+  if (idx < 0) {
+    // No row to land before: go after the last item already in that column.
+    let last = -1;
+    rest.forEach((it, k) => { if (it.group === group) last = k; });
+    idx = last < 0 ? rest.length : last + 1;
+  }
+  rest.splice(idx, 0, { ...item, group });
+  state.customEquipment = rest;
+  persist(); render();
+}
+
+document.addEventListener('dragstart', (e) => {
+  const row = e.target.closest?.('.equipment-row');
+  if (!row) return;
+  dragEquipId = row.dataset.equipId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragEquipId);
+  row.classList.add('dragging');
+});
+
+document.addEventListener('dragover', (e) => {
+  if (!dragEquipId) return;
+  const col = e.target.closest?.('.equipment-col');
+  if (!col) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  clearDropMarks();
+  col.classList.add('drop-target');
+  const row = e.target.closest('.equipment-row');
+  if (row && row.dataset.equipId !== dragEquipId) {
+    const r = row.getBoundingClientRect();
+    row.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
+  }
+});
+
+document.addEventListener('drop', (e) => {
+  if (!dragEquipId) return;
+  const col = e.target.closest?.('.equipment-col');
+  if (!col) return;
+  e.preventDefault();
+  let beforeId = null;
+  const row = e.target.closest('.equipment-row');
+  if (row && row.dataset.equipId !== dragEquipId) {
+    const r = row.getBoundingClientRect();
+    if (e.clientY < r.top + r.height / 2) {
+      beforeId = row.dataset.equipId;
+    } else {
+      // After this row = before whichever row follows it in the column.
+      let next = row.nextElementSibling;
+      while (next && !(next.classList.contains('equipment-row') && next.dataset.equipId !== dragEquipId)) next = next.nextElementSibling;
+      beforeId = next ? next.dataset.equipId : null;
+    }
+  }
+  const id = dragEquipId;
+  endEquipDrag();
+  moveEquipmentItem(id, col.dataset.group, beforeId);
+});
+
+document.addEventListener('dragend', endEquipDrag);
 
 // ---------------- event delegation ----------------
 
